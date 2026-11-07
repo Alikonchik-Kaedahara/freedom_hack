@@ -1,13 +1,10 @@
-// Обзор: supervisor workbench — telemetry strip, criteria performance chart, priority triage.
-import { h, icon, fmtScore, scoreClass, channelLabel, pluralRu } from '../ui.js';
-import { state, subscribe, summaryFor, resultFor, pendingAppeals, allAppeals } from '../store.js';
+// Главная: the work desk — what to do today (three queues), then how things are overall.
+import { h, fmtScore, scoreClass, pluralRu } from '../ui.js';
+import { state, subscribe, summaryFor, resultFor, allAppeals } from '../store.js';
 import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
-import { setRibbonAction } from '../app.js';
 
-const OPERATOR_SCORE_TARGET = 80;
 const SVGNS = 'http://www.w3.org/2000/svg';
-const MODEL_LABEL = { 'claude-opus-5-5': 'Claude Opus 5.5', 'claude-sonnet-5-5': 'Claude Sonnet 5.5', 'claude-haiku-5-5': 'Claude Haiku 5.5' };
 
 export function renderDashboard(root) {
   const draw = () => root.replaceChildren(build());
@@ -28,99 +25,89 @@ function build() {
   const pendingIds = recs.filter((r) => !summaryFor(r.conversation_id)).map((r) => r.conversation_id);
   const totals = evaluated.map((r) => summaryFor(r.conversation_id).total).filter((t) => t != null);
   const avg = totals.length ? round2(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
-  const gross = evaluated.filter((r) => summaryFor(r.conversation_id).gross).length;
-  const appeals = allAppeals();
-  const pending = pendingAppeals().length;
-  const resolved = appeals.length - pending;
   const running = state.job?.status === 'running';
-  const chats = recs.filter((r) => r.channel !== 'voice call').length;
-  const calls = recs.length - chats;
 
-  const evalBtn = () => (pendingIds.length && !running
-    ? h('button', { class: 'btn btn-primary btn-lg eval-main', onclick: () => startEvaluation(pendingIds) },
-      icon('sparkles', 15), `Оценить ${pendingIds.length} ${pluralRu(pendingIds.length, 'диалог', 'диалога', 'диалогов')}`)
-    : null);
-  setRibbonAction(evalBtn());
-
+  const sub = [`Набор ${state.group} · ${recs.length} ${pluralRu(recs.length, 'диалог', 'диалога', 'диалогов')}`];
+  if (evaluated.length) sub.push(`оценено ${evaluated.length}`);
+  if (avg != null) sub.push(`средний балл ${fmtScore(avg)}`);
+  const action = running
+    ? h('span', { class: 'muted' }, 'Идёт оценка…')
+    : pendingIds.length && evaluated.length
+      ? h('button', { class: 'btn btn-primary', onclick: () => startEvaluation(pendingIds) }, `Оценить ${pendingIds.length} ${pluralRu(pendingIds.length, 'новый', 'новых', 'новых')}`)
+      : null;
   const head = h('div', { class: 'page-head' },
-    h('div', null, h('h1', null, 'Обзор качества'),
-      h('div', { class: 'sub' }, `Набор ${state.group} · ${recs.length} ${pluralRu(recs.length, 'диалог', 'диалога', 'диалогов')}`)),
-    h('div', { class: 'head-actions' }, evalBtn()));
-
-  // ----- telemetry strip -----
-  const pct = recs.length ? evaluated.length / recs.length : 0;
-  const ops = operatorStats(evaluated);
-  const strip = h('div', { class: 'card tstrip' },
-    cell('Средний балл', h('span', { class: 'val' }, h('span', { class: `score ${scoreClass(avg)}` }, fmtScore(avg)), h('small', null, '/ 100')),
-      avg == null ? 'нет оценок' : `по ${totals.length} ${pluralRu(totals.length, 'диалогу', 'диалогам', 'диалогам')}`),
-    cell('Проверено диалогов', h('span', { class: 'val' }, evaluated.length, h('small', null, `из ${recs.length}`)),
-      h('div', { class: 'stack-foot' }, progressSvg(pct), h('span', null, `${chats} ${pluralRu(chats, 'чат', 'чата', 'чатов')} · ${calls} ${pluralRu(calls, 'звонок', 'звонка', 'звонков')}`)), { stack: true }),
-    cell('Грубые ошибки', h('span', { class: 'val' }, gross),
-      gross ? `${gross} ${pluralRu(gross, 'диалог', 'диалога', 'диалогов')} · нулевая терпимость` : 'не выявлено', { cls: gross ? 'danger' : 'ok' }),
-    cell('Апелляции', h('span', { class: 'val', style: { color: pending ? 'var(--cqa-warn-text)' : 'var(--cqa-text-muted)' } }, `${pending} / ${resolved}`),
-      pending ? `ждут решения · решено ${resolved}` : 'решено, новых нет'),
-    cell('Операторы', h('span', { class: 'val' }, ops.total, ops.total ? h('small', null, ops.below ? `· ${ops.below} ниже цели` : '· все выше цели') : null),
-      ops.total ? h('a', { href: '#/operators', class: 'link-btn' }, ops.weakest ? `Самый низкий балл: ${ops.weakest}` : 'Открыть профили') : 'появятся после оценки'));
+    h('div', null, h('h1', null, 'Главная'), h('div', { class: 'sub' }, sub.join(' · '))),
+    h('div', { class: 'head-actions' }, action));
 
   if (!evaluated.length) {
     const first5 = pendingIds.slice(0, 5);
-    return h('div', { class: 'page' }, head, strip,
-      h('div', { class: 'card quickstart', style: { marginTop: '12px' } },
-        h('div', { class: 'empty-icon' }, icon('sparkles', 20)),
-        h('div', { class: 'qs-text' },
-          h('b', null, running ? 'Идёт оценка диалогов' : 'Быстрый старт'),
-          h('span', { class: 'muted' }, running ? 'Результаты появятся здесь по мере готовности.' : `Оцените несколько диалогов, чтобы проверить модель, или сразу весь набор. Модель: ${modelName()}.`)),
-        !running && h('button', { class: 'btn btn-secondary', onclick: () => startEvaluation(first5) }, icon('sparkles', 15), `Оценить первые ${first5.length}`),
-        !running && h('button', { class: 'btn btn-primary', onclick: () => startEvaluation(pendingIds) }, `Оценить все ${pendingIds.length}`)));
+    return h('div', { class: 'page' }, head,
+      h('div', { class: 'card start-card' },
+        h('h3', { class: 'card-title' }, running ? 'Идёт оценка' : 'Начните с оценки'),
+        h('p', { class: 'muted' }, running
+          ? 'Оценки появятся здесь по мере готовности.'
+          : 'Система проверит диалоги по чек-листу: выставит баллы, объяснит каждое решение и отметит грубые ошибки.'),
+        running ? null : h('div', { class: 'start-actions' },
+          h('button', { class: 'btn btn-secondary', onclick: () => startEvaluation(first5) }, `Оценить первые ${first5.length}`),
+          h('button', { class: 'btn btn-primary', onclick: () => startEvaluation(pendingIds) }, `Оценить все ${pendingIds.length}`))));
   }
 
-  return h('div', { class: 'page' }, head, strip,
+  return h('div', { class: 'page' }, head, queueCards(evaluated),
     h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)));
 }
 
-function cell(label, value, foot, opts = {}) {
-  return h('div', { class: `tcell ${opts.cls || ''}` },
-    h('div', { class: 'lbl' }, opts.icon ? icon(opts.icon, 13) : null, label),
-    value,
-    opts.stack ? foot : h('div', { class: 'foot' }, foot));
+const LOW = 65; // an operator average below this needs attention
+const UNNAMED = new Set(['Не представился', '[Имя скрыто]', '']);
+const isToday = (iso) => { if (!iso) return false; const d = new Date(iso); const n = new Date(); return d.toDateString() === n.toDateString(); };
+
+/** «Что мне сделать сегодня»: three work queues, each opening an already filtered list. */
+function queueCards(evaluated) {
+  const gross = evaluated.filter((r) => summaryFor(r.conversation_id).gross).length;
+  const disputed = evaluated.filter((r) => summaryFor(r.conversation_id).disputed?.length).length;
+  const appeals = allAppeals();
+  const waiting = appeals.filter((x) => x.appeal.status === 'pending').length;
+  const decidedToday = appeals.filter((x) => x.appeal.status !== 'pending' && isToday(x.appeal.decision?.decidedAt)).length;
+  const ops = operatorStats(evaluated);
+
+  const line = (n, text, href) => h('a', { class: `q-line ${n ? '' : 'zero'}`, href }, h('b', null, n), ` ${text}`);
+  const card = (title, lines, btn) => h('div', { class: 'card q-card' }, h('h3', { class: 'card-title' }, title), h('div', { class: 'q-lines' }, lines), h('div', { class: 'q-foot' }, btn));
+  return h('div', { class: 'queue-cards' },
+    card('Требуют разбора', [
+      line(gross, pluralRu(gross, 'грубая ошибка', 'грубые ошибки', 'грубых ошибок'), '#/dialogs?f=gross'),
+      line(disputed, pluralRu(disputed, 'спорная оценка', 'спорные оценки', 'спорных оценок'), '#/dialogs?f=disputed'),
+    ], gross || disputed
+      ? h('a', { class: 'btn btn-secondary btn-sm', href: gross ? '#/dialogs?f=gross' : '#/dialogs?f=disputed' }, 'Открыть список')
+      : h('span', { class: 'muted' }, 'Всё разобрано')),
+    card('Апелляции', [
+      line(waiting, waiting === 1 ? 'ждёт решения' : 'ждут решения', '#/appeals'),
+      line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals'),
+    ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : 'Открыть апелляции')),
+    card('Операторы', ops.total ? [
+      line(ops.below, `из ${ops.total} ${ops.below === 1 ? 'требует' : 'требуют'} внимания`, '#/operators'),
+      ops.weakest ? h('div', { class: 'q-line plain' }, 'самый низкий балл: ', h('b', null, ops.weakest.name), ` · ${fmtScore(ops.weakest.avg)}`) : null,
+    ] : [h('div', { class: 'q-line plain' }, 'Имена операторов появятся после оценки')],
+    h('a', { class: 'btn btn-secondary btn-sm', href: '#/operators' }, 'К операторам')));
 }
 
-function progressSvg(p) {
-  const w = Math.max(0, Math.min(1, p)) * 100;
-  return svg('svg', { class: 'spark', viewBox: '0 0 100 6', preserveAspectRatio: 'none', role: 'img', 'aria-label': `${Math.round(w)}%` },
-    svg('rect', { class: 'trk', x: 0, y: 0, width: 100, height: 6, rx: 3 }),
-    svg('rect', { class: 'ok', x: 0, y: 0, width: w, height: 6, rx: 3 }));
-}
-
-function modelName() {
-  const s = state.settings;
-  if (!s) return '—';
-  if (s.engine === 'local') return `Локальная · ${s.local?.model || ''}`;
-  if (s.engine === 'replay') return 'сохранённые оценки, без модели';
-  return MODEL_LABEL[s.cloud?.model] || s.cloud?.model || 'Claude';
-}
-
-/** Operators of the evaluated dialogs: how many, how many average below the target, who is weakest. */
+/** Operators of the evaluated dialogs: how many, how many average below LOW, who is lowest. */
 function operatorStats(evaluated) {
   const per = new Map();
   for (const r of evaluated) {
-    const res = resultFor(r.conversation_id);
-    const name = res?.operator;
+    const name = (resultFor(r.conversation_id)?.operator || '').trim();
     const total = summaryFor(r.conversation_id)?.total;
-    if (!name || name === 'Не представился' || total == null) continue;
+    if (UNNAMED.has(name) || total == null) continue;
     const p = per.get(name) || { sum: 0, n: 0 };
     p.sum += total; p.n += 1;
     per.set(name, p);
   }
-  let weakest = null, min = Infinity, below = 0;
+  let weakest = null, below = 0;
   for (const [name, p] of per) {
     const avg = p.sum / p.n;
-    if (avg < OPERATOR_SCORE_TARGET) below += 1;
-    if (avg < min) { min = avg; weakest = name; }
+    if (avg < LOW) below += 1;
+    if (!weakest || avg < weakest.avg) weakest = { name, avg: round2(avg) };
   }
   return { total: per.size, below, weakest };
 }
-
 
 function criteriaCard(evaluated) {
   // Average share of the criterion's weight earned, plus how often it was N/A (chats and calls together).
@@ -140,7 +127,7 @@ function criteriaCard(evaluated) {
   const rows = [...agg.values()].sort((a, b) => String(a.code).localeCompare(String(b.code)));
   // Phones get a narrower viewBox so the text stays readable instead of shrinking with the SVG.
   const narrow = window.matchMedia('(max-width: 820px)').matches;
-  const W = narrow ? 340 : 600, rowH = 32, labelW = narrow ? 168 : 250, barW = narrow ? 120 : 240, maxName = narrow ? 18 : 32;
+  const W = narrow ? 340 : 640, rowH = 32, labelW = narrow ? 168 : 240, barW = narrow ? 120 : 210, maxName = narrow ? 18 : 30;
   const H = rows.length * rowH + 4;
   const chart = svg('svg', { class: 'cchart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Выполнение критериев' },
     rows.map((a, i) => {
@@ -153,17 +140,16 @@ function criteriaCard(evaluated) {
         svg('text', { x: 28, y: y + 15 }, svg('title', null, a.name), name),
         svg('rect', { class: 'trk', x: labelW, y: y + 5, width: barW, height: 12, rx: 2 }),
         pct != null ? svg('rect', { class: tone, x: labelW, y: y + 5, width: Math.max(2, barW * pct), height: 12, rx: 2 }) : null,
-        svg('text', { class: 'pct', x: labelW + barW + 10, y: y + 15 }, pct == null ? '—' : `${Math.round(pct * 100)}%`, !narrow && a.na ? svg('tspan', { class: 'na' }, `, N/A ${a.na}`) : null),
+        svg('text', { class: 'pct', x: labelW + barW + 10, y: y + 15 }, pct == null ? '—' : `${Math.round(pct * 100)}%`, !narrow && a.na ? svg('tspan', { class: 'na' }, ` · не применим в ${a.na}`) : null),
         null);
     }));
   return h('div', { class: 'card card-pad' },
-    h('h3', { class: 'card-title' }, 'Выполнение критериев 01–07', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, `по ${evaluated.length} ${pluralRu(evaluated.length, 'диалогу', 'диалогам', 'диалогам')}`)),
+    h('h3', { class: 'card-title' }, `Выполнение критериев (${evaluated.length} ${pluralRu(evaluated.length, 'диалог', 'диалога', 'диалогов')})`),
     chart,
     h('div', { class: 'legend-inline' },
-      h('span', null, h('i', { class: 'ok' }), 'Хорошо (≥ 85%)'),
-      h('span', null, h('i', { class: 'part' }), 'Средне (60–84%)'),
-      h('span', null, h('i', { class: 'fail' }), 'Проблемная зона (< 60%)'),
-      h('span', null, 'N/A — критерий неприменим')),
+      h('span', null, h('i', { class: 'ok' }), 'от 85%'),
+      h('span', null, h('i', { class: 'part' }), '60–84%'),
+      h('span', null, h('i', { class: 'fail' }), 'ниже 60%')),
     segments(evaluated));
 }
 
@@ -174,12 +160,12 @@ function segments(evaluated) {
     const list = evaluated.filter(test).map((r) => summaryFor(r.conversation_id).total).filter((t) => t != null);
     if (!list.length) return null;
     const avg = round2(list.reduce((a, b) => a + b, 0) / list.length);
-    return h('span', { class: 'tag outline' }, `${label} ${fmtScore(avg)}`);
+    return h('span', { class: 'seg-item' }, `${label} ${Math.round(avg)}`);
   }));
 }
 
 function triageCard(evaluated) {
-  // Gross errors first, then pending appeals, disputed criteria (failed validation / low confidence), lowest totals.
+  // Gross errors first, then pending appeals, disputed criteria, lowest totals.
   const items = evaluated.map((r) => {
     const s = summaryFor(r.conversation_id);
     const res = resultFor(r.conversation_id);
@@ -187,24 +173,23 @@ function triageCard(evaluated) {
     const flagCrit = res.checklist.criteria.find((c) => c.type === 'flag' && fa[c.id]?.answer === 'yes');
     const disputed = (s.disputed || []).map((id) => res.checklist.criteria.find((c) => c.id === id)).filter(Boolean);
     const kind = s.gross ? 'gross' : s.pending ? 'appeal' : disputed.length ? 'disputed' : 'low';
-    const why = kind === 'gross' ? (fa[flagCrit.id]?.explanation || 'Грубая ошибка')
+    const why = kind === 'gross' ? `Грубая ошибка: ${fa[flagCrit.id]?.explanation || 'см. карточку'}`
       : kind === 'appeal' ? 'Апелляция ждёт решения'
-        : kind === 'disputed' ? `Спорно: ${disputed.map((c) => c.code || c.name).join(', ')}` : 'Низкий итоговый балл';
-    return { r, s, kind, why, rank: { gross: 0, appeal: 1, disputed: 2, low: 3 }[kind] * 1000 + (s.total ?? 0) };
+        : kind === 'disputed' ? `Спорная оценка: ${disputed.map((c) => c.code || c.name).join(', ')}` : 'Низкий итоговый балл';
+    return { r, s, res, why, rank: { gross: 0, appeal: 1, disputed: 2, low: 3 }[kind] * 1000 + (s.total ?? 0) };
   }).sort((a, b) => a.rank - b.rank).slice(0, 8);
 
   return h('div', { class: 'card card-pad' },
-    h('h3', { class: 'card-title' }, 'Приоритетный разбор', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, 'требуют внимания')),
-    h('div', { class: 'tri-list' }, items.map(({ r, s, kind, why }) =>
-      h('div', { class: 'tri-row' },
+    h('h3', { class: 'card-title' }, 'Очередь на разбор'),
+    h('div', { class: 'tri-list' }, items.map(({ r, s, res, why }) => {
+      const op = (res?.operator || '').trim();
+      return h('div', { class: 'tri-row' },
         h('div', { class: 'main' },
-          h('div', { class: 'line' }, h('span', { class: 'id' }, r.conversation_id), h('span', { class: 'sep' }, '|'),
-            h('span', { class: 'meta' }, `${channelLabel(r.channel)} · ${r.language}`)),
+          h('div', { class: 'line' }, h('span', { class: 'id' }, r.conversation_id),
+            op && !UNNAMED.has(op) ? [h('span', { class: 'sep' }, '·'), h('span', { class: 'meta' }, op)] : null,
+            h('span', { class: 'sep' }, '·'), h('span', { class: 'meta' }, r.language)),
           h('div', { class: 'why', title: why }, why)),
         h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total)),
-        h('a', { class: 'go', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Открыть'),
-        kind === 'gross' ? h('span', { class: 'flag08', title: 'Грубая ошибка, критерий 08' }, icon('alert', 13), '08')
-          : kind === 'appeal' ? h('span', { class: 'flag08 soft', title: 'Апелляция ждёт решения' }, icon('scale', 13))
-            : kind === 'disputed' ? h('span', { class: 'flag08 soft', title: 'Спорный критерий' }, icon('alert', 13), '?')
-              : h('span')))));
+        h('a', { class: 'btn btn-secondary btn-xs', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Открыть'));
+    })));
 }

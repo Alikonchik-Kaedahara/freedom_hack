@@ -313,7 +313,7 @@ export function renderChecklists(root, id) {
   function switchTo(cid) {
     if (dirty && !confirm('Есть несохранённые изменения. Перейти без сохранения?')) return;
     dirty = false;
-    location.hash = `#/checklists/${encodeURIComponent(cid)}`;
+    location.hash = `#/settings/checklists/${encodeURIComponent(cid)}`;
   }
 
   async function createNew() {
@@ -326,7 +326,7 @@ export function renderChecklists(root, id) {
       const saved = await api.saveChecklist(copy);
       await refreshChecklists();
       dirty = false;
-      location.hash = `#/checklists/${encodeURIComponent(saved.id)}`;
+      location.hash = `#/settings/checklists/${encodeURIComponent(saved.id)}`;
     } catch (e) { toast(e.message, { type: 'error' }); }
   }
 
@@ -337,7 +337,7 @@ export function renderChecklists(root, id) {
       footer: [
         h('button', { class: 'btn btn-ghost', onclick: () => m.close() }, 'Отмена'),
         h('button', { class: 'btn btn-danger', onclick: async () => {
-          try { await api.deleteChecklist(draft.id); await refreshChecklists(); m.close(); dirty = false; location.hash = '#/checklists'; }
+          try { await api.deleteChecklist(draft.id); await refreshChecklists(); m.close(); dirty = false; location.hash = '#/settings/checklists'; }
           catch (e) { toast(e.message, { type: 'error' }); }
         } }, 'Удалить'),
       ],

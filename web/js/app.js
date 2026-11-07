@@ -16,28 +16,35 @@ import { renderModel } from './views/model.js';
 import { renderQuality } from './views/quality.js';
 import { renderOperators } from './views/operators.js';
 import { renderKnowledge } from './views/knowledge.js';
+import { renderSettings } from './views/settings.js';
+import { getUser, onUserChange, askUser, setUser, initials } from './user.js';
 
+// Six sections. Checklists, the fact reference, the model and integration live in Settings.
 const NAV = [
-  { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid', rail: 'home' },
-  { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list', rail: 'clockR' },
-  { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', rail: 'bookmark', badge: () => pendingAppeals().length },
-  { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks', rail: 'headset' },
-  { path: '/model', label: 'Настройки', short: 'Настройки', icon: 'gear', rail: 'gear', more: true },
-  { path: '/quality', label: 'Качество', short: 'Качество', icon: 'target', more: true },
-  { path: '/operators', label: 'Операторы', short: 'Операторы', icon: 'headset', more: true },
-  { path: '/knowledge', label: 'Справочник', short: 'Справочник', icon: 'database', more: true },
+  { path: '/', label: 'Главная', short: 'Главная', icon: 'home' },
+  { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list' },
+  { path: '/operators', label: 'Операторы', short: 'Операторы', icon: 'headset' },
+  { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
+  { path: '/quality', label: 'Качество оценки', short: 'Качество оценки', icon: 'target' },
+  { path: '/settings', label: 'Настройки', short: 'Настройки', icon: 'gear' },
 ];
+// Phones: four tabs plus «Ещё»
+const PHONE_TABS = ['/', '/dialogs', '/appeals', '/operators'];
 
 const ROUTES = [
   [/^\/$/, renderDashboard],
   [/^\/dialogs$/, renderDialogs],
   [/^\/dialog\/(.+)$/, renderDialog],
   [/^\/appeals$/, renderAppeals],
-  [/^\/checklists(?:\/(.+))?$/, renderChecklists],
-  [/^\/model$/, renderModel],
   [/^\/quality$/, renderQuality],
   [/^\/operators(?:\/(.+))?$/, renderOperators],
-  [/^\/knowledge$/, renderKnowledge],
+  [/^\/settings(?:\/([^/]+))?(?:\/(.+))?$/, renderSettings],
+];
+// Old links (from cards, bookmarks) keep working.
+const REDIRECTS = [
+  [/^\/checklists(\/.*)?$/, (m) => `/settings/checklists${m[1] || ''}`],
+  [/^\/knowledge$/, () => '/settings/knowledge'],
+  [/^\/model$/, () => '/settings/model'],
 ];
 
 const HOST_KEY = 'cqa.hostPreview';
@@ -47,13 +54,11 @@ let cleanup = null;
 let currentPath = null;
 let mounted = false;
 
-const currentRoute = () => decodeURI(location.hash.replace(/^#/, '') || '/');
+const currentRoute = () => decodeURI(location.hash.replace(/^#/, '').split('?')[0] || '/');
 const isActive = (item, path) => (item.path === '/' ? path === '/' : path.startsWith(item.path) || (item.path === '/dialogs' && path.startsWith('/dialog/')));
 
-/** Views put their main evaluation button into the ribbon (desktop); phones keep it in the page head. */
-export function setRibbonAction(node) {
-  if (ui.action) ui.action.replaceChildren(...(node ? [node] : []));
-}
+/** The main action of a screen lives in the page head now; kept as a no-op for older view code. */
+export function setRibbonAction() {}
 
 function buildShell(root) {
   ui.root = root;
@@ -62,9 +67,9 @@ function buildShell(root) {
   ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
     icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host'));
   ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая / тёмная тема', 'aria-label': 'Светлая / тёмная тема' }, icon('contrast', 15));
-  ui.action = h('div', { class: 'rb-action' });
+  ui.user = h('button', { class: 'user-card', type: 'button', 'aria-haspopup': 'menu' });
   ui.bridge = h('span', { class: 'bridge-badge', hidden: true });
-  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.theme, ui.action);
+  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.theme, ui.user);
   ui.rail = h('nav', { class: 'cqa-d365-rail', 'aria-label': 'Разделы CQA' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
@@ -72,8 +77,8 @@ function buildShell(root) {
   const ribbon = h('header', { class: 'ribbon' },
     h('a', { class: 'rb-brand', href: '#/' },
       h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
-      h('span', { class: 'word' }, h('b', null, 'FREEDOM'), h('small', null, 'BROKER')),
-      h('span', { class: 'rb-title' }, 'Conversation Quality Analytics')),
+      h('span', { class: 'rb-name' }, 'Freedom Broker'),
+      h('span', { class: 'rb-title' }, 'Контроль качества')),
     ui.tabs, ui.right);
 
   const d365Top = h('div', { class: 'cqa-d365-top' },
@@ -92,9 +97,37 @@ function buildShell(root) {
   ui.pill.addEventListener('click', (e) => { e.stopPropagation(); openDatasetPopover(ui.right); });
   ui.host.addEventListener('click', () => setHostPreview(!root.classList.contains('cqa-host-on')));
   ui.theme.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
+  ui.user.addEventListener('click', (e) => { e.stopPropagation(); openUserMenu(); });
+  onUserChange(renderUser);
+  renderUser();
   setTheme(readPref(THEME_KEY) === 'dark' ? 'dark' : 'light', false);
-  if (D365Bridge.ready) { ui.host.hidden = true; updateBridge(); } // already inside Dynamics 365
-  else setHostPreview(readPref(HOST_KEY) !== '0', false); // the Dynamics 365 frame is the default look
+  // The Dynamics 365 workspace frame is off by default; Settings → Интеграция turns it on for a demo.
+  // Inside the real CRM the bridge talks to Xrm and no imitation frame is drawn.
+  if (D365Bridge.ready) { ui.host.hidden = true; updateBridge(); }
+  else setHostPreview(readPref(HOST_KEY) === '1', false);
+}
+
+function renderUser() {
+  const u = getUser();
+  ui.user.replaceChildren(
+    h('span', { class: 'uc-avatar' }, u ? initials(u.name) : icon('user', 14)),
+    h('span', { class: 'uc-text' }, h('b', null, u ? u.name : 'Представиться'), u ? h('small', null, u.role) : null));
+  ui.user.title = u ? `${u.name} · ${u.role}` : 'Укажите имя: оно попадёт в апелляции';
+}
+
+function openUserMenu() {
+  const existing = ui.root.querySelector('.user-menu');
+  if (existing) { existing.remove(); return; }
+  const u = getUser();
+  if (!u) { askUser(); return; }
+  const close = () => { menu.remove(); document.removeEventListener('click', close); };
+  const menu = h('div', { class: 'user-menu', role: 'menu' },
+    h('div', { class: 'um-head' }, h('b', null, u.name), h('small', null, u.role)),
+    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); askUser({ title: 'Сменить пользователя' }); } }, 'Сменить пользователя'),
+    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); setUser(null); } }, 'Выйти'));
+  menu.addEventListener('click', (e) => e.stopPropagation());
+  ui.right.append(menu);
+  setTimeout(() => document.addEventListener('click', close), 0);
 }
 
 function setTheme(theme, persist = true) {
@@ -105,7 +138,7 @@ function setTheme(theme, persist = true) {
 
 /** Settings page: the Dynamics 365 frame on/off and the integration status line. */
 export const hostFrame = {
-  get on() { return ui.root?.classList.contains('cqa-host-on') ?? true; },
+  get on() { return ui.root?.classList.contains('cqa-host-on') ?? false; },
   set(on) { setHostPreview(on); },
   get embedded() { return D365Bridge.ready && !D365Bridge.simulated; },
   get status() {
@@ -133,27 +166,26 @@ function updateBridge() {
 
 function renderChrome() {
   const path = currentRoute();
+  const link = (item, cls, ...kids) => h('a', { href: `#${item.path}`, class: `${cls || ''} ${isActive(item, path) ? 'active' : ''}`, title: item.label }, ...kids);
   ui.tabs.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
-    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
-      icon(item.icon, 16), item.label, badge ? h('span', { class: 'badge' }, badge) : null);
+    return link(item, '', item.label, badge ? h('span', { class: 'badge' }, badge) : null);
   }));
   ui.rail.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
-    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', title: item.label },
-      icon(item.rail || item.icon, 20), h('span', null, item.short), badge ? h('span', { class: 'badge' }, badge) : null);
+    return link(item, '', icon(item.icon, 20), h('span', null, item.short), badge ? h('span', { class: 'badge' }, badge) : null);
   }));
-  const more = NAV.filter((item) => item.more);
+  const phone = NAV.filter((item) => PHONE_TABS.includes(item.path));
+  const more = NAV.filter((item) => !PHONE_TABS.includes(item.path));
   const moreActive = more.some((item) => isActive(item, path));
-  ui.tabbar.replaceChildren(...NAV.filter((item) => !item.more).map((item) => {
+  ui.tabbar.replaceChildren(...phone.map((item) => {
     const badge = item.badge ? item.badge() : 0;
-    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
-      h('span', { class: 'tab-icon' }, icon(item.icon, 21), badge ? h('span', { class: 'dot' }, badge) : null),
+    return link(item, '', h('span', { class: 'tab-icon' }, icon(item.icon, 21), badge ? h('span', { class: 'dot' }, badge) : null),
       h('span', { class: 'tab-label' }, item.short));
   }), h('a', { href: '#', class: `tab-more ${moreActive ? 'active' : ''}`, onclick: (e) => { e.preventDefault(); openMoreSheet(more, path); } },
-    h('span', { class: 'tab-icon' }, icon('waffle', 21)), h('span', { class: 'tab-label' }, moreActive ? more.find((item) => isActive(item, path)).short : 'Ещё')));
+    h('span', { class: 'tab-icon' }, icon('waffle', 21)), h('span', { class: 'tab-label' }, 'Ещё')));
   const ds = state.datasets.find((d) => d.groupId === state.group);
-  ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'Набор:'), h('span', { class: 'mono' }, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
+  ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'Набор:'), h('span', null, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
   ui.root.classList.toggle('no-data', !state.group);
 }
 
@@ -161,8 +193,10 @@ function renderChrome() {
 function openMoreSheet(items, path) {
   const existing = ui.root.querySelector('.more-sheet');
   if (existing) { existing.remove(); return; }
+  const dark = ui.root.dataset.theme === 'dark';
   const sheet = h('div', { class: 'more-sheet' }, items.map((item) => h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', onclick: () => sheet.remove() },
-    icon(item.icon, 18), h('span', null, item.label))));
+    icon(item.icon, 18), h('span', null, item.label))),
+  h('a', { href: '#', onclick: (e) => { e.preventDefault(); sheet.remove(); setTheme(dark ? 'light' : 'dark'); } }, icon('contrast', 18), h('span', null, dark ? 'Светлая тема' : 'Тёмная тема')));
   const dismiss = (e) => { if (!sheet.contains(e.target) && !ui.tabbar.contains(e.target)) { sheet.remove(); document.removeEventListener('mousedown', dismiss, true); } };
   setTimeout(() => document.addEventListener('mousedown', dismiss, true), 0);
   ui.root.append(sheet);
@@ -170,11 +204,15 @@ function openMoreSheet(items, path) {
 
 function route() {
   const path = currentRoute();
+  for (const [re, to] of REDIRECTS) {
+    const m = path.match(re);
+    if (m) { location.replace(`#${to(m)}`); return; }
+  }
   if (cleanup) { try { cleanup(); } catch { /* noop */ } cleanup = null; }
   const samePage = path === currentPath;
   currentPath = path;
-  setRibbonAction(null);
   renderChrome();
+  ui.root.querySelector('.user-menu')?.remove();
   ui.root.querySelector('.more-sheet')?.remove();
   clear(ui.view);
   D365Bridge.post('route', { path });

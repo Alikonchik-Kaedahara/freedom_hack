@@ -3,6 +3,8 @@ import { h, icon, toast } from '../ui.js';
 import { api } from '../api.js';
 import { state, saveSettings } from '../store.js';
 import { hostFrame } from '../app.js';
+import { D365Bridge } from '../bridge.js';
+import { openExportModal } from './export.js';
 
 const MODELS = [
   { id: 'claude-opus-5-5', label: 'Claude Opus 5.5', price: [4, 20] },
@@ -12,7 +14,8 @@ const MODELS = [
 // Typical size of one evaluation: checklist + transcript in, verdicts out (with thinking).
 const TYPICAL = { input: 4500, output: 2500 };
 
-export function renderModel(root) {
+// part: 'model' (which model scores), 'export' (results file), 'integration' (Dynamics 365)
+export function renderModel(root, part = 'model') {
   const page = h('div', { class: 'page' });
   root.append(page);
   let status = null;
@@ -76,23 +79,35 @@ export function renderModel(root) {
     // team_name for results/<dev|prod>/results.json (the organizers' submission format)
     const teamInput = h('input', { class: 'input', value: s.teamName || '', placeholder: 'Название подразделения или команды', autocomplete: 'off' });
     const team = h('div', { class: 'card card-pad' },
-      h('h3', { class: 'card-title' }, 'Выгрузка результатов'),
-      h('div', { class: 'muted', style: { marginBottom: '10px' } },
-        'Это название записывается в файл результатов (results.json), который формируется кнопкой «Выгрузить» в реестре диалогов.'),
+      h('h3', { class: 'card-title' }, 'Название в файле результатов'),
+      h('div', { class: 'muted', style: { marginBottom: '10px' } }, 'Подразделение или команда, от имени которой выгружаются результаты.'),
       h('div', { style: { display: 'flex', gap: '10px', maxWidth: '520px' } }, teamInput,
-        h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => save({ teamName: teamInput.value.trim() }) }, 'Сохранить')));
+        h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => save({ teamName: teamInput.value.trim() }) }, 'Сохранить название')));
+    const download = h('div', { class: 'card card-pad' },
+      h('h3', { class: 'card-title' }, 'Файл результатов'),
+      h('div', { class: 'muted', style: { marginBottom: '10px' } }, `Оценки набора ${state.group}: по одному объекту на диалог, восемь критериев и итоговый балл.`),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: openExportModal }, icon('download', 15), 'Скачать результаты'));
 
+    const linked = D365Bridge.ready;
     const integration = h('div', { class: 'card card-pad' },
       h('h3', { class: 'card-title' }, 'Dynamics 365'),
-      h('div', { class: 'muted', style: { marginBottom: '10px' } }, hostFrame.status),
+      h('div', { class: `status ${linked ? 'ok' : ''}`, style: { marginBottom: '8px' } }, h('i'),
+        hostFrame.embedded ? 'Связь с Dynamics 365 активна' : linked ? 'Связь с рабочим пространством активна (показ встраивания)' : 'Приложение открыто отдельно от Dynamics 365'),
+      h('div', { class: 'muted', style: { marginBottom: '12px' } }, hostFrame.status),
       hostFrame.embedded ? null : h('label', { class: 'switch' },
-        h('input', { type: 'checkbox', checked: hostFrame.on, onchange: (e) => hostFrame.set(e.target.checked) }),
+        h('input', { type: 'checkbox', checked: hostFrame.on, onchange: (e) => { hostFrame.set(e.target.checked); draw(); } }),
         h('span', { class: 'track' }), 'Показывать рамку рабочего пространства Dynamics 365'));
 
-    page.replaceChildren(
-      h('div', { class: 'page-head' }, h('div', null, h('h1', null, 'Настройки'), h('div', { class: 'sub' }, 'Модель, которая оценивает диалоги; баллы и перераспределение N/A считает сама система по правилам чек-листа.'))),
-      h('div', { class: 'engines' }, cloud, local, replay),
-      h('div', { class: 'grid two-one', style: { marginTop: '12px' } }, team, integration));
+    const head = (title, sub) => h('div', { class: 'page-head' }, h('div', null, h('h1', null, title), h('div', { class: 'sub' }, sub)));
+    if (part === 'export') {
+      page.replaceChildren(head('Выгрузка', 'Файл результатов для отчётности и проверки.'), h('div', { class: 'grid two-one' }, download, team));
+    } else if (part === 'integration') {
+      page.replaceChildren(head('Интеграция', 'Встраивание в рабочее пространство Dynamics 365.'), integration);
+    } else {
+      page.replaceChildren(
+        head('Модель оценки', 'Какая модель оценивает диалоги. Баллы и перераспределение N/A считает сама система по правилам чек-листа.'),
+        h('div', { class: 'engines' }, cloud, local, replay));
+    }
   };
 
   const statusEl = () => {

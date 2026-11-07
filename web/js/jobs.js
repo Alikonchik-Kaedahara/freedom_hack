@@ -1,7 +1,7 @@
 // Evaluation jobs: start, poll, show progress in the dock.
 import { api } from './api.js';
 import { state, emit, refreshResults } from './store.js';
-import { h, toast, clear, pluralRu, layer } from './ui.js';
+import { h, toast, clear, pluralRu, layer, openModal } from './ui.js';
 
 let timer = null;
 
@@ -22,7 +22,7 @@ export async function startEvaluation(ids, { checklistId } = {}) {
   } catch (e) {
     toast(e.message, {
       type: 'error',
-      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/model') } : null,
+      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/settings/model') } : null,
     });
   }
 }
@@ -40,9 +40,26 @@ export async function startSecondOpinion(ids, engine) {
   } catch (e) {
     toast(e.message, {
       type: 'error',
-      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/model') } : null,
+      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/settings/model') } : null,
     });
   }
+}
+
+/** Ask before a second opinion: it re-runs the evaluation and costs as much as the first one. */
+export function confirmSecondOpinion(ids) {
+  if (!ids.length) return;
+  const n = ids.length;
+  // Rough pace: cloud runs 4 dialogs at a time (~20 s each), the local engine one at a time (~30 s).
+  const perDialog = state.settings?.engine === 'local' ? 30 : 5;
+  const minutes = Math.max(1, Math.round((n * perDialog) / 60));
+  const m = openModal({
+    title: 'Второе мнение',
+    sub: `Будет сделано ${n} ${pluralRu(n, 'повторная оценка', 'повторные оценки', 'повторных оценок')}. Это займёт около ${minutes} ${pluralRu(minutes, 'минуты', 'минут', 'минут')}. Первая оценка не меняется; критерии, где ответы разойдутся, станут спорными.`,
+    footer: [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); startSecondOpinion(ids); } }, 'Запустить'),
+    ],
+  });
 }
 
 export async function resumeJobs() {
