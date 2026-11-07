@@ -189,7 +189,7 @@ export function renderDialog(root, cid) {
           const f = facts.find((x) => x.id === id);
           return h('div', { class: 'kb-fact' }, h('span', { class: 'mono' }, id), ' ', f ? f.fact : '— факт не найден в текущем справочнике');
         }),
-        h('a', { href: '#/knowledge', class: 'link-btn', style: { fontSize: '12px', marginTop: '4px' } }, 'Открыть справочник')));
+        h('a', { href: '#/settings/knowledge', class: 'link-btn', style: { fontSize: '12px', marginTop: '4px' } }, 'Открыть справочник')));
   }
 
   function drawBanner() {

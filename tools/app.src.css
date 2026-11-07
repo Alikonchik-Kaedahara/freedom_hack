@@ -1008,6 +1008,24 @@ p { margin: 0; }
 .user-menu button:hover { background: var(--cqa-bg-elevated); }
 .cqa-d365-rail a { font-size: 11px; }
 
+/* ============ v5 · 9. Settings with tabs ============ */
+.settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; align-items: start; }
+.settings-tabs { display: flex; flex-direction: column; padding: 6px; gap: 2px; position: sticky; top: calc(var(--cqa-chrome) + 12px); }
+.settings-tabs a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 4px; color: var(--cqa-text-secondary); font-weight: 600; font-size: 13.5px; }
+.settings-tabs a:hover { background: var(--cqa-bg-elevated); color: var(--cqa-text-primary); }
+.settings-tabs a.active { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+.settings-body > .page { padding: 0; }
+.settings-body .page-head h1 { font-size: 17px; }
+.settings-body .page-head { min-height: 0; }
+.user-form { display: grid; grid-template-columns: auto minmax(0, 260px) minmax(0, 220px) auto; gap: 14px; align-items: end; }
+.user-form .uc-avatar.big { width: 48px; height: 48px; font-size: 16px; background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+.export-choice { display: flex; gap: 8px; flex-wrap: wrap; }
+.export-report { display: flex; flex-direction: column; gap: 8px; }
+.export-report .btn { align-self: flex-start; }
+.export-status { font-weight: 600; }
+.export-status.ok { color: var(--cqa-pass-text); }
+.export-status.warn { color: var(--cqa-warn-text); }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
@@ -1042,6 +1060,12 @@ p { margin: 0; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
   .rb-title, .bridge-badge { display: none !important; }
+  .settings { grid-template-columns: 1fr; }
+  .settings-tabs { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 4px; }
+  .settings-tabs::-webkit-scrollbar { display: none; }
+  .settings-tabs a { flex: none; padding: 8px 10px; }
+  .settings-tabs a .ic { display: none; }
+  .user-form { grid-template-columns: 1fr; align-items: stretch; }
   .rb-name { font-size: 13.5px; }
   .theme-toggle { display: none !important; }
   .user-card { padding: 0 2px; }

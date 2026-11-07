@@ -22,7 +22,7 @@ export async function startEvaluation(ids, { checklistId } = {}) {
   } catch (e) {
     toast(e.message, {
       type: 'error',
-      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/model') } : null,
+      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/settings/model') } : null,
     });
   }
 }
@@ -40,7 +40,7 @@ export async function startSecondOpinion(ids, engine) {
   } catch (e) {
     toast(e.message, {
       type: 'error',
-      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/model') } : null,
+      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/settings/model') } : null,
     });
   }
 }

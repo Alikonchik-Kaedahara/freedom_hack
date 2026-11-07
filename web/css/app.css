@@ -990,6 +990,22 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .user-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 4px; font-size: 13.5px; }
 #cqa-d365-root .user-menu button:hover { background: var(--cqa-bg-elevated); }
 #cqa-d365-root .cqa-d365-rail a { font-size: 11px; }
+#cqa-d365-root .settings { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 12px; align-items: start; }
+#cqa-d365-root .settings-tabs { display: flex; flex-direction: column; padding: 6px; gap: 2px; position: sticky; top: calc(var(--cqa-chrome) + 12px); }
+#cqa-d365-root .settings-tabs a { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 4px; color: var(--cqa-text-secondary); font-weight: 600; font-size: 13.5px; }
+#cqa-d365-root .settings-tabs a:hover { background: var(--cqa-bg-elevated); color: var(--cqa-text-primary); }
+#cqa-d365-root .settings-tabs a.active { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+#cqa-d365-root .settings-body > .page { padding: 0; }
+#cqa-d365-root .settings-body .page-head h1 { font-size: 17px; }
+#cqa-d365-root .settings-body .page-head { min-height: 0; }
+#cqa-d365-root .user-form { display: grid; grid-template-columns: auto minmax(0, 260px) minmax(0, 220px) auto; gap: 14px; align-items: end; }
+#cqa-d365-root .user-form .uc-avatar.big { width: 48px; height: 48px; font-size: 16px; background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+#cqa-d365-root .export-choice { display: flex; gap: 8px; flex-wrap: wrap; }
+#cqa-d365-root .export-report { display: flex; flex-direction: column; gap: 8px; }
+#cqa-d365-root .export-report .btn { align-self: flex-start; }
+#cqa-d365-root .export-status { font-weight: 600; }
+#cqa-d365-root .export-status.ok { color: var(--cqa-pass-text); }
+#cqa-d365-root .export-status.warn { color: var(--cqa-warn-text); }
 @media (max-width: 1560px) {
 #cqa-d365-root .rb-tabs a .ic { display: none; }
 #cqa-d365-root .rb-tabs a { padding: 0 9px; }
@@ -1028,6 +1044,12 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .rb-action { display: none !important; }
 #cqa-d365-root .rb-title,
 #cqa-d365-root .bridge-badge { display: none !important; }
+#cqa-d365-root .settings { grid-template-columns: 1fr; }
+#cqa-d365-root .settings-tabs { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 4px; }
+#cqa-d365-root .settings-tabs::-webkit-scrollbar { display: none; }
+#cqa-d365-root .settings-tabs a { flex: none; padding: 8px 10px; }
+#cqa-d365-root .settings-tabs a .ic { display: none; }
+#cqa-d365-root .user-form { grid-template-columns: 1fr; align-items: stretch; }
 #cqa-d365-root .rb-name { font-size: 13.5px; }
 #cqa-d365-root .theme-toggle { display: none !important; }
 #cqa-d365-root .user-card { padding: 0 2px; }
