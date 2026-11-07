@@ -11,37 +11,29 @@ import { renderDashboard } from './views/dashboard.js';
 import { renderDialogs } from './views/dialogs.js';
 import { renderDialog } from './views/dialog.js';
 import { renderAppeals } from './views/appeals.js';
-import { renderChecklists } from './views/checklists.js';
-import { renderModel } from './views/model.js';
-import { renderQuality } from './views/quality.js';
 import { renderOperators } from './views/operators.js';
-import { renderKnowledge } from './views/knowledge.js';
 import { renderSettings } from './views/settings.js';
 import { getUser, onUserChange, askUser, setUser, initials } from './user.js';
 
-// Six sections. Checklists, the fact reference, the model and integration live in Settings.
+// Daily work is in the four main sections; settings have a separate control.
 const NAV = [
   { path: '/', label: 'Главная', short: 'Главная', icon: 'home' },
   { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list' },
   { path: '/operators', label: 'Операторы', short: 'Операторы', icon: 'headset' },
   { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
-  { path: '/quality', label: 'Качество оценки', short: 'Качество оценки', icon: 'target' },
-  { path: '/settings', label: 'Настройки', short: 'Настройки', icon: 'gear' },
 ];
-// Phones: four tabs plus «Ещё»
-const PHONE_TABS = ['/', '/dialogs', '/appeals', '/operators'];
 
 const ROUTES = [
   [/^\/$/, renderDashboard],
   [/^\/dialogs$/, renderDialogs],
   [/^\/dialog\/(.+)$/, renderDialog],
   [/^\/appeals$/, renderAppeals],
-  [/^\/quality$/, renderQuality],
   [/^\/operators(?:\/(.+))?$/, renderOperators],
   [/^\/settings(?:\/([^/]+))?(?:\/(.+))?$/, renderSettings],
 ];
 // Old links (from cards, bookmarks) keep working.
 const REDIRECTS = [
+  [/^\/quality$/, () => '/settings/verification'],
   [/^\/checklists(\/.*)?$/, (m) => `/settings/checklists${m[1] || ''}`],
   [/^\/knowledge$/, () => '/settings/knowledge'],
   [/^\/model$/, () => '/settings/model'],
@@ -67,9 +59,10 @@ function buildShell(root) {
   ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
     icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host'));
   ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая / тёмная тема', 'aria-label': 'Светлая / тёмная тема' }, icon('contrast', 15));
+  ui.settings = h('a', { class: 'settings-gear', href: '#/settings', title: 'Настройки', 'aria-label': 'Настройки' }, icon('gear', 18));
   ui.user = h('button', { class: 'user-card', type: 'button', 'aria-haspopup': 'menu' });
   ui.bridge = h('span', { class: 'bridge-badge', hidden: true });
-  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.theme, ui.user);
+  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.theme, ui.settings, ui.user);
   ui.rail = h('nav', { class: 'cqa-d365-rail', 'aria-label': 'Разделы CQA' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
@@ -175,37 +168,23 @@ function renderChrome() {
     const badge = item.badge ? item.badge() : 0;
     return link(item, '', icon(item.icon, 20), h('span', null, item.short), badge ? h('span', { class: 'badge' }, badge) : null);
   }));
-  const phone = NAV.filter((item) => PHONE_TABS.includes(item.path));
-  const more = NAV.filter((item) => !PHONE_TABS.includes(item.path));
-  const moreActive = more.some((item) => isActive(item, path));
-  ui.tabbar.replaceChildren(...phone.map((item) => {
+  if (path.startsWith('/settings')) ui.settings.setAttribute('aria-current', 'page');
+  else ui.settings.removeAttribute('aria-current');
+  ui.tabbar.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
     return link(item, '', h('span', { class: 'tab-icon' }, icon(item.icon, 21), badge ? h('span', { class: 'dot' }, badge) : null),
       h('span', { class: 'tab-label' }, item.short));
-  }), h('a', { href: '#', class: `tab-more ${moreActive ? 'active' : ''}`, onclick: (e) => { e.preventDefault(); openMoreSheet(more, path); } },
-    h('span', { class: 'tab-icon' }, icon('waffle', 21)), h('span', { class: 'tab-label' }, 'Ещё')));
+  }));
   const ds = state.datasets.find((d) => d.groupId === state.group);
   ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'Набор:'), h('span', null, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
   ui.root.classList.toggle('no-data', !state.group);
 }
 
-/** Phone-only: the secondary sections behind the «Ещё» tab. */
-function openMoreSheet(items, path) {
-  const existing = ui.root.querySelector('.more-sheet');
-  if (existing) { existing.remove(); return; }
-  const dark = ui.root.dataset.theme === 'dark';
-  const sheet = h('div', { class: 'more-sheet' }, items.map((item) => h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', onclick: () => sheet.remove() },
-    icon(item.icon, 18), h('span', null, item.label))),
-  h('a', { href: '#', onclick: (e) => { e.preventDefault(); sheet.remove(); setTheme(dark ? 'light' : 'dark'); } }, icon('contrast', 18), h('span', null, dark ? 'Светлая тема' : 'Тёмная тема')));
-  const dismiss = (e) => { if (!sheet.contains(e.target) && !ui.tabbar.contains(e.target)) { sheet.remove(); document.removeEventListener('mousedown', dismiss, true); } };
-  setTimeout(() => document.addEventListener('mousedown', dismiss, true), 0);
-  ui.root.append(sheet);
-}
-
 /** Browser tab and history show where the person is: «Диалог p1-ru-005 · Контроль качества». */
 function setTitle(path) {
   const dialog = path.match(/^\/dialog\/(.+)$/);
-  const section = dialog ? `Диалог ${decodeURIComponent(dialog[1])}` : (NAV.find((item) => isActive(item, path))?.label || 'Контроль качества');
+  const settingsTitle = path === '/settings/verification' ? 'Проверка модели' : 'Настройки';
+  const section = path.startsWith('/settings') ? settingsTitle : dialog ? `Диалог ${decodeURIComponent(dialog[1])}` : (NAV.find((item) => isActive(item, path))?.label || 'Контроль качества');
   document.title = section === 'Главная' ? 'Контроль качества диалогов · Freedom Broker' : `${section} · Контроль качества`;
 }
 
@@ -221,10 +200,9 @@ function route() {
   renderChrome();
   setTitle(path);
   ui.root.querySelector('.user-menu')?.remove();
-  ui.root.querySelector('.more-sheet')?.remove();
   clear(ui.view);
   D365Bridge.post('route', { path });
-  if (!state.group) { cleanup = renderImportStage(ui.view) || null; return; }
+  if (!state.group && !path.startsWith('/settings')) { cleanup = renderImportStage(ui.view) || null; return; }
   for (const [re, fn] of ROUTES) {
     const m = path.match(re);
     if (m) {

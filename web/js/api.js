@@ -62,7 +62,12 @@ export const api = {
 
   evaluate: (body) => req('POST', '/api/evaluate', body),
   secondOpinion: (body) => req('POST', '/api/second-opinion', body),
-  quality: (g) => req('GET', `/api/quality?group=${e(g)}`),
+  quality: (g, section, operator) => {
+    const params = new URLSearchParams({ group: g });
+    if (section) params.set('section', section);
+    if (operator != null) params.set('operator', operator);
+    return req('GET', `/api/quality?${params}`);
+  },
   uploadCalibration: (file) => upload('/api/quality/calibration', file),
   clearCalibration: () => req('DELETE', '/api/quality/calibration'),
   operators: (g) => req('GET', `/api/operators?group=${e(g)}`),
@@ -70,7 +75,7 @@ export const api = {
   knowledge: (g) => req('GET', `/api/knowledge${g ? `?group=${e(g)}` : ''}`),
   saveKnowledge: (doc) => req('PUT', '/api/knowledge', doc),
   resetKnowledge: () => req('POST', '/api/knowledge/reset'),
-  reportUrl: (g, cid) => `${BASE}/report/${e(g)}/${e(cid)}`,
+  reportUrl: (g, cid, format = 'html') => `${BASE}/report/${e(g)}/${e(cid)}${format === 'pdf' ? '?format=pdf' : ''}`,
   job: (id) => req('GET', `/api/jobs/${e(id)}`),
   jobs: () => req('GET', '/api/jobs'),
 

@@ -3,6 +3,7 @@
 import { h, icon, fmtScore, scoreClass, channelIcon, pluralRu } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe } from '../store.js';
+import { violationPanel } from './insights.js';
 
 const UNKNOWN = 'Не представился';
 const UNNAMED = new Set([UNKNOWN, '[Имя скрыто]']);
@@ -21,8 +22,10 @@ export function renderOperators(root, name) {
   root.append(page);
   let profiles = null;
   let error = null;
+  const violations = name ? violationPanel(name) : null;
 
   async function load() {
+    violations?.refresh();
     try { profiles = await api.operators(state.group); error = null; } catch (e) { error = e.message; profiles = []; }
     draw();
   }
@@ -152,7 +155,7 @@ export function renderOperators(root, name) {
         h('td', null, h('span', { class: `score ${scoreClass(d.total)}` }, fmtScore(d.total))),
         h('td', { class: 'why' }, d.gross ? h('span', { class: 'tag red' }, 'Грубая ошибка') : (d.failed.length ? `не выполнено: ${d.failed.join(', ')}` : h('span', { class: 'muted' }, 'всё выполнено'))),
         h('td', { class: 'row-act' }, h('a', { class: 'btn btn-secondary btn-xs', href: `#/dialog/${encodeURIComponent(d.conversationId)}` }, 'Открыть'))))))));
-    return h('div', { class: 'grid two-one' }, dialogs, crit);
+    return h('div', { class: 'profile-work' }, violations.el, h('div', { class: 'grid two-one' }, dialogs, crit));
   }
 
   function bar(v) {

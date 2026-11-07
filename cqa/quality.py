@@ -1,6 +1,6 @@
 """Quality of the evaluation itself: how the model compares with people and with itself.
 
-Three sources, all shown on the «Качество оценки» screen:
+Three sources for the model verification and appeals views:
 
 1. Calibration — a manual markup of a handful of dialogs by the team (the Google-sheet
    protocol in docs/todo), uploaded as JSON or the xlsx export of that sheet. Agreement
@@ -18,7 +18,7 @@ import collections
 import io
 import json
 
-from . import scoring, second, storage
+from . import operators, scoring, second, storage
 
 VALUE_WORDS = {"да": "yes", "yes": "yes", "true": "yes", "нет": "no", "no": "no", "false": "no",
                "n/a": "na", "na": "na", "n\\a": "na", "null": "na", "none": "na", "—": None, "-": None, "": None}
@@ -181,16 +181,22 @@ def appeal_stats(results):
     total = accepted = rejected = pending = 0
     for r in results.values():
         codes = {c["id"]: c for c in r["checklist"]["criteria"]}
+        values = {key: a.get("answer") for key, a in (r.get("answers") or {}).items()}
         for a in r.get("appeals") or []:
             c = codes.get(a.get("criterionId"))
             code = (c.get("code") if c else None) or a.get("criterionId")
-            p = per.setdefault(code, {"code": code, "name": c["name"] if c else "", "total": 0, "accepted": 0, "rejected": 0, "pending": 0})
+            p = per.setdefault(code, {"code": code, "name": c["name"] if c else "", "total": 0, "accepted": 0, "rejected": 0, "pending": 0, "changed": 0})
             p["total"] += 1
             total += 1
             st = a.get("status")
             if st == "accepted":
                 p["accepted"] += 1
                 accepted += 1
+                cid = a.get("criterionId")
+                new_value = (a.get("decision") or {}).get("answer")
+                if new_value is not None and new_value != values.get(cid):
+                    p["changed"] += 1
+                    values[cid] = new_value
             elif st == "rejected":
                 p["rejected"] += 1
                 rejected += 1
@@ -201,8 +207,10 @@ def appeal_stats(results):
         decided = p["accepted"] + p["rejected"]
         p["overturnRate"] = scoring.round2(p["accepted"] / decided * 100) if decided else None
     decided = accepted + rejected
+    changed = sum(p["changed"] for p in per.values())
     return {"total": total, "accepted": accepted, "rejected": rejected, "pending": pending,
             "overturnRate": scoring.round2(accepted / decided * 100) if decided else None,
+            "changed": changed, "changeRate": scoring.round2(changed / decided * 100) if decided else None,
             "perCriterion": sorted(per.values(), key=lambda x: str(x["code"]))}
 
 
@@ -252,26 +260,29 @@ def patterns(results, records, limit_examples=3):
 def _example(rec, r, fa, c):
     a = fa.get(c["id"]) or {}
     ev = a.get("evidence") or []
-    quote = None
-    for i in ev:
-        if 0 <= i < len(rec["transcript"]) and rec["transcript"][i].get("speaker") == "operator":
-            quote = rec["transcript"][i]["text"]
-            break
-    if quote is None and ev and 0 <= ev[0] < len(rec["transcript"]):
-        quote = rec["transcript"][ev[0]]["text"]
-    return {"conversationId": rec["conversation_id"], "language": rec.get("language"), "quote": (quote or "")[:220],
-            "explanation": a.get("explanation") or "", "turn": (ev[0] + 1) if ev else None}
+    valid = [i for i in ev if isinstance(i, int) and 0 <= i < len(rec["transcript"])]
+    turn = next((i for i in valid if rec["transcript"][i].get("speaker") == "operator"), valid[0] if valid else None)
+    quote = rec["transcript"][turn]["text"] if turn is not None else ""
+    return {"conversationId": rec["conversation_id"], "criterionId": c["id"], "language": rec.get("language"),
+            "quote": quote[:220], "explanation": a.get("explanation") or "", "turn": turn + 1 if turn is not None else None}
 
 
 # ---------- the whole screen ----------
 
-def overview(group_id):
-    records = storage.get_dataset(group_id)
+def overview(group_id, section=None, operator=None):
     results = storage.get_results(group_id)
-    return {
+    if section == "appeals":
+        return appeal_stats(results)
+    records = storage.get_dataset(group_id)
+    if section == "patterns":
+        if operator is not None:
+            records = [rec for rec in records if operators.operator_of(rec, results.get(storage.result_key(group_id, rec["conversation_id"]))) == operator]
+        return patterns(results, records)
+    verification = {
         "group": group_id, "evaluated": len(results), "records": len(records),
         "calibration": agreement(results, records=records),
         "reproducibility": second.reproducibility(list(results.values())),
-        "appeals": appeal_stats(results),
-        "patterns": patterns(results, records),
     }
+    if section == "model":
+        return verification
+    return {**verification, "appeals": appeal_stats(results), "patterns": patterns(results, records)}

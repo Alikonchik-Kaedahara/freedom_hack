@@ -905,7 +905,6 @@ p { margin: 0; }
 .interp-field .textarea { font-size: 13px; }
 
 /* phone tab bar: «Ещё» sheet for the secondary sections */
-.more-sheet { display: none; }
 
 
 /* ============ v4: working tool for the quality team (no developer chrome, calmer numbers) ============ */
@@ -1195,7 +1194,6 @@ a.q-line:hover b { text-decoration: underline; }
   .settings-tabs a .ic { display: none; }
   .user-form { grid-template-columns: 1fr; align-items: stretch; }
   .rb-name { font-size: 13.5px; }
-  .theme-toggle { display: none !important; }
   .user-card { padding: 0 2px; }
   .theme-toggle { width: 34px; padding: 0; justify-content: center; }
   .page-head { padding: 12px 14px; min-height: 0; }
@@ -1208,7 +1206,7 @@ a.q-line:hover b { text-decoration: underline; }
   .cqa-popover { position: fixed; top: calc(var(--cqa-ribbon) + env(safe-area-inset-top) + 6px); left: 12px; right: 12px; width: auto; }
 
   .tabbar {
-    display: grid; grid-template-columns: repeat(5, minmax(0, 1fr));
+    display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 30;
     background: rgba(255,255,255,.95); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border-top: 1px solid var(--cqa-border-hairline); padding: 5px 4px calc(5px + env(safe-area-inset-bottom));
@@ -1346,14 +1344,7 @@ a.q-line:hover b { text-decoration: underline; }
   .kb-topic { width: 110px; }
   .kb-usage ul { position: static; box-shadow: none; max-width: none; }
   .qtable td:nth-child(2) { min-width: 0; }
-  .more-sheet {
-    display: flex; flex-direction: column; position: fixed; left: 10px; right: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 31;
-    background: var(--cqa-bg-surface); border: 1px solid var(--cqa-border-strong); border-radius: 10px; box-shadow: var(--cqa-shadow-pop); padding: 6px; animation: cqa-sheet .18s ease-out;
-  }
-  .more-sheet a { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border-radius: 6px; color: var(--cqa-text-primary); font-weight: 600; font-size: 14px; text-decoration: none; }
-  .more-sheet a.active { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
-  .more-sheet a .ic { color: var(--cqa-text-muted); }
-  .more-sheet a.active .ic { color: var(--cqa-brand-primary); }
+
 }
 
 /* ============ Phones: v4 registry with the operator column ============ */
@@ -1431,4 +1422,34 @@ a.q-line:hover b { text-decoration: underline; }
 /* People who asked their system for less motion get none: no spinners' spin, no pulses, no sliding sheets. */
 @media (prefers-reduced-motion: reduce) {
   :scope *, :scope *::before, :scope *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+.settings-gear { width: 36px; height: 36px; display: inline-grid; place-items: center; flex: none; border-radius: var(--cqa-radius); color: #fff; }
+.settings-gear:hover, .settings-gear[aria-current] { background: rgba(255,255,255,.16); }
+.settings-jump { display: none; }
+.q-cards.verification-cards { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.insight-panel { margin-top: 12px; min-width: 0; }
+.profile-work > .insight-panel { margin: 0 0 12px; }
+.insight-scope { margin: 0 0 8px; }
+.insight-row { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px 12px; border-top: 1px solid var(--cqa-border-hairline); padding: 10px 0; }
+.insight-name { display: inline-flex; gap: 8px; align-items: baseline; width: fit-content; color: var(--cqa-text-primary); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.insight-rate { font-weight: 700; font-variant-numeric: tabular-nums; }
+.insight-count, .insight-examples { grid-column: 1 / -1; }
+.insight-examples summary, .insight-more summary { cursor: pointer; color: var(--cqa-text-secondary); }
+.insight-more { margin-top: 8px; }
+.insight-summary strong { font-size: 22px; }
+@media (max-width: 1180px) {
+  .q-cards.verification-cards { grid-template-columns: 1fr; }
+}
+@media (max-width: 820px) {
+  .settings-tabs { display: none; }
+  .settings-jump { display: block; width: 100%; }
+  .dashboard-page > .insight-panel { order: 6; margin-top: 0; }
+  .rb-right { gap: 4px; }
+}
+@media (max-width: 450px) {
+  .rb-name, .ds-pill .k { display: none; }
+}
+@media (max-width: 360px) {
+  .rb-name { display: none; }
 }

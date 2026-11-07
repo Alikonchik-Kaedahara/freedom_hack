@@ -5,19 +5,23 @@ import { state, subscribe, allAppeals, putResult } from '../store.js';
 import { finalAnswers, score, verdictOf, answerOptions, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
 import { requireUser, shortName } from '../user.js';
 import { displayTimes } from './dialog.js';
+import { appealsPanel } from './insights.js';
 
 let tab = 'pending';
-let viewRoot = null;
+let drawActive = null;
 const UNNAMED = new Set(['', 'Не представился', '[Имя скрыто]']);
 
 export function renderAppeals(root) {
-  viewRoot = root;
-  const draw = () => root.replaceChildren(build());
+  const stats = appealsPanel();
+  const draw = () => root.replaceChildren(build(stats.el));
+  drawActive = draw;
   draw();
-  return subscribe((w) => { if (w === 'results') draw(); });
+  stats.refresh();
+  const off = subscribe((w) => { if (w === 'results') { draw(); stats.refresh(); } });
+  return () => { drawActive = null; off(); };
 }
 
-function rerender() { viewRoot?.replaceChildren(build()); }
+function rerender() { drawActive?.(); }
 
 /** «Томирис А., 8 нояб., 01:12» — or just the date when the name was not recorded. */
 export function byLine(name, iso) {
@@ -29,7 +33,7 @@ const verdictText = (c, answer) => {
   return c.type === 'scale' && v.max != null && answer !== 'na' ? `${v.text} из ${v.max}` : v.text;
 };
 
-function build() {
+function build(stats) {
   const items = allAppeals();
   const pending = items.filter((x) => x.appeal.status === 'pending');
   const done = items.filter((x) => x.appeal.status !== 'pending')
@@ -63,7 +67,7 @@ function build() {
 
   return h('div', { class: 'page' },
     h('div', { class: 'page-head' }, h('div', null, h('h1', null, 'Апелляции'), h('div', { class: 'sub' }, sub)), items.length ? seg : null),
-    h('div', { class: 'card', style: { overflow: 'hidden' } }, content));
+    h('div', { class: 'card', style: { overflow: 'hidden' } }, content), stats);
 }
 
 function row({ result, appeal }) {

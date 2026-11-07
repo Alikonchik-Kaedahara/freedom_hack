@@ -20,7 +20,13 @@ function resetFilters() {
 
 export function renderDialogs(root) {
   // Links from Home open the registry already filtered: #/dialogs?f=gross | disputed | appeal
-  const preset = hashQuery().get('f');
+  const query = hashQuery();
+  const preset = query.get('f');
+  let violation = query.get('violation');
+  const operator = query.get('operator');
+  if (violation) resetFilters();
+  const violationCriterion = (res) => res?.checklist.criteria.find((c) => String(c.code || c.id) === violation);
+  const clearViolation = () => { violation = null; clearHashQuery(); };
   if (['gross', 'disputed', 'appeal', 'review', 'reviewed'].includes(preset)) {
     resetFilters();
     filters[preset] = true;
@@ -35,6 +41,12 @@ export function renderDialogs(root) {
   const visible = () => {
     const rows = state.records.filter((r) => {
       const s = summaryFor(r.conversation_id);
+      if (violation) {
+        const res = resultFor(r.conversation_id);
+        const c = violationCriterion(res);
+        if (!c || (operator != null && res.operator !== operator)) return false;
+        if (!['fail', 'part', 'flag'].includes(s?.final.per[c.id]?.status)) return false;
+      }
       if (filters.lang.size && !filters.lang.has(r.language)) return false;
       if (filters.channel.size && !filters.channel.has(r.channel)) return false;
       if (filters.gross && !(filters.review ? reviewCriteria(r.conversation_id, 'gross').length : s?.gross)) return false;
@@ -108,6 +120,9 @@ export function renderDialogs(root) {
     chipsHost.replaceChildren(h('div', { class: 'toolbar reg-toolbar' },
       h('div', { class: 'search' }, icon('search', 16), search),
       h('div', { class: 'chips' },
+        violation && h('button', { class: 'chip on', type: 'button',
+          title: 'Снять фильтр по нарушению', onclick: () => { clearViolation(); drawChips(); drawRows(); } },
+          `Критерий ${violation}${operator != null ? ' · ' + operator : ''} ×`),
         ['RU', 'KZ', 'EN'].map((l) => chip(l, filters.lang.has(l), toggleSet(filters.lang, l))),
         h('span', { class: 'chip-sep' }),
         chip('Чат', filters.channel.has('agent chat'), toggleSet(filters.channel, 'agent chat')),
@@ -160,7 +175,7 @@ export function renderDialogs(root) {
     if (!rows.length) {
       tbodyHost.replaceChildren(h('div', { class: 'empty' },
         h('h3', null, 'По этим условиям диалогов нет'),
-        anyFilter() ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { resetFilters(); drawChips(); drawRows(); } }, 'Сбросить фильтры') : null));
+        anyFilter() || violation ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { resetFilters(); clearViolation(); drawChips(); drawRows(); } }, 'Сбросить фильтры') : null));
       footHost.replaceChildren();
       return;
     }
@@ -215,7 +230,8 @@ export function renderDialogs(root) {
     });
     const open = () => {
       rememberReviewList(visible().map((r) => r.conversation_id));
-      location.hash = reviewLink(cid, queue);
+      const c = violation && violationCriterion(res);
+      location.hash = c ? `#/dialog/${encodeURIComponent(cid)}?criterion=${encodeURIComponent(c.id)}` : reviewLink(cid, queue);
     };
     const m = matchOf(r);
     const act = s

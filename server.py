@@ -622,7 +622,10 @@ def quality_overview():
     group_id = request.args.get("group")
     if not group_id:
         return bad("Укажите набор: ?group=DEV")
-    return jsonify(quality.overview(group_id))
+    section = request.args.get("section")
+    if section not in (None, "model", "appeals", "patterns"):
+        return bad("Неизвестный раздел статистики")
+    return jsonify(quality.overview(group_id, section, request.args.get("operator")))
 
 
 @app.post("/api/quality/calibration")
@@ -713,15 +716,23 @@ def knowledge_reset():
 
 @app.get("/report/<group_id>/<path:conversation_id>")
 def report(group_id, conversation_id):
-    """Self-contained HTML of one evaluated dialog for printing / Save as PDF."""
+    """Printable HTML by default, or a PDF attachment when requested."""
     from cqa import report as report_mod
 
+    fmt = request.args.get("format", "html")
+    if fmt not in ("html", "pdf"):
+        return bad("Доступные форматы отчёта: PDF и HTML")
     record = storage.get_record(group_id, conversation_id)
     result = storage.get_result(storage.result_key(group_id, conversation_id))
     if not record or not result:
         abort(404)
-    html_text = report_mod.render(record, result, team_name(), operators.operator_of(record, result))
-    return Response(html_text, mimetype="text/html; charset=utf-8")
+    args = (record, result, team_name(), operators.operator_of(record, result))
+    if fmt == "pdf":
+        from cqa import report_pdf
+        filename = re.sub(r"[^\w.-]+", "_", conversation_id)[:100]
+        return send_file(report_pdf.render(report_mod.content(*args)), mimetype="application/pdf",
+                         as_attachment=True, download_name=f"CQA-{filename}.pdf", max_age=0)
+    return Response(report_mod.render(*args), mimetype="text/html")
 
 
 # ---------- export in the organizers' format ----------

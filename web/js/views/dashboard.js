@@ -5,13 +5,19 @@ import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 
 import { reviewCriteria, reviewLink, rememberReviewList } from '../review.js';
+import { violationPanel } from './insights.js';
 
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 export function renderDashboard(root) {
-  const draw = () => root.replaceChildren(build());
+  const panel = violationPanel();
+  const draw = () => root.replaceChildren(build(panel.el));
   draw();
-  return subscribe((w) => { if (w === 'results' || w === 'job') draw(); });
+  if (root.contains(panel.el)) panel.refresh();
+  return subscribe((w) => {
+    if (w === 'results' || w === 'job') draw();
+    if (w === 'results' && root.contains(panel.el)) panel.refresh();
+  });
 }
 
 function svg(tag, attrs, ...kids) {
@@ -21,7 +27,7 @@ function svg(tag, attrs, ...kids) {
   return el;
 }
 
-function build() {
+function build(patterns) {
   const recs = state.records;
   const evaluated = recs.filter((r) => summaryFor(r.conversation_id));
   const pendingIds = recs.filter((r) => !summaryFor(r.conversation_id)).map((r) => r.conversation_id);
@@ -55,7 +61,7 @@ function build() {
   }
 
   return h('div', { class: 'page dashboard-page' }, head, queueCards(evaluated),
-    h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)));
+    h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)), patterns);
 }
 
 const LOW = 65; // Individual dialog scores below this threshold need attention.

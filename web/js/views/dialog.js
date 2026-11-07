@@ -165,7 +165,8 @@ export function renderDialog(root, cid) {
       res.reviewLog?.length && { label: 'История проверок', onClick: () => showHistory(res) },
       !running && { label: 'Переоценить', onClick: () => startEvaluation([cid]) },
       { label: res.secondOpinion ? 'Второе мнение ещё раз' : 'Второе мнение', onClick: () => confirmSecondOpinion([cid]) },
-      { label: 'Скачать отчёт', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank' },
+      { label: 'Скачать отчёт в PDF', href: api.reportUrl(state.group, cid, 'pdf'), download: true },
+      { label: 'Открыть для печати', href: api.reportUrl(state.group, cid), target: '_blank' },
       { label: 'Указать оператора', onClick: () => renameOperator(res) },
     ]) : null;
     headHost.replaceChildren(h('div', { class: 'page-head' },

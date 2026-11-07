@@ -159,9 +159,12 @@ def test_appeal_stats_and_patterns():
                       {"id": "2", "criterionId": "c1", "status": "rejected", "decision": {"answer": None}},
                       {"id": "3", "criterionId": "c5", "status": "pending"}]
     st = quality.appeal_stats({res["key"]: res, res2["key"]: res2})
-    assert st == {"total": 3, "accepted": 1, "rejected": 1, "pending": 1, "overturnRate": 50.0,
-                  "perCriterion": [{"code": "01", "name": CHAT["criteria"][0]["name"], "total": 1, "accepted": 0, "rejected": 1, "pending": 0, "overturnRate": 0.0},
-                                   {"code": "05", "name": CHAT["criteria"][4]["name"], "total": 2, "accepted": 1, "rejected": 0, "pending": 1, "overturnRate": 100.0}]}
+    assert st == {"total": 3, "accepted": 1, "rejected": 1, "pending": 1, "overturnRate": 50.0, "changed": 1, "changeRate": 50.0,
+                  "perCriterion": [{"code": "01", "name": CHAT["criteria"][0]["name"], "total": 1, "accepted": 0, "rejected": 1, "pending": 0, "changed": 0, "overturnRate": 0.0},
+                                   {"code": "05", "name": CHAT["criteria"][4]["name"], "total": 2, "accepted": 1, "rejected": 0, "pending": 1, "changed": 1, "overturnRate": 100.0}]}
+    res["appeals"].append({"criterionId": "c5", "status": "accepted", "decision": {"answer": "yes"}})
+    repeated = quality.appeal_stats({res["key"]: res})
+    assert repeated["accepted"] == 2 and repeated["changed"] == 1 and repeated["changeRate"] == 33.33
     p = quality.patterns({res["key"]: res, res2["key"]: res2}, [rec, rec2])
     assert p["dialogs"] == 2
     by_code = {c["code"]: c for c in p["criteria"]}
@@ -399,6 +402,14 @@ def test_quality_calibration_operators_knowledge_report_endpoints(client, monkey
     r = client.put("/api/results/SAMPLE:sample-ru-001/operator", json={"name": "Тест Тестов"})
     assert r.status_code == 200 and r.get_json()["operatorName"] == "Тест Тестов"
     assert any(p["name"] == "Тест Тестов" for p in client.get("/api/operators?group=SAMPLE").get_json())
+    path = "/api/quality"
+    scoped = client.get(path, query_string={"group": "SAMPLE", "section": "patterns", "operator": "Тест Тестов"}).get_json()
+    assert scoped["dialogs"] == 1
+    assert all(e["conversationId"] == "sample-ru-001" for c in scoped["criteria"] for e in c["examples"])
+    assert client.get(path + "?group=SAMPLE&section=patterns").get_json()["dialogs"] == 5
+    assert client.get(path + "?group=SAMPLE&section=appeals").get_json()["changeRate"] is None
+    assert "reproducibility" in client.get(path + "?group=SAMPLE&section=model").get_json()
+    assert client.get(path + "?group=SAMPLE&section=unknown").status_code == 400
     assert client.put("/api/results/SAMPLE:sample-ru-001/operator", json={"name": ""}).get_json().get("operatorName") is None
     assert client.put("/api/results/SAMPLE:nope/operator", json={"name": "x"}).status_code == 404
 
@@ -407,6 +418,13 @@ def test_quality_calibration_operators_knowledge_report_endpoints(client, monkey
     assert r.status_code == 200 and r.mimetype == "text/html"
     body = r.get_data(as_text=True)
     assert "ГРУБАЯ ОШИБКА" in body and "Отчёт по качеству диалога sample-en-004" in body
+    assert 'href="?format=pdf"' in body and 'onclick="window.print()"' in body
+    pdf = client.get("/report/SAMPLE/sample-en-004?format=pdf")
+    assert pdf.status_code == 200 and pdf.mimetype == "application/pdf"
+    assert pdf.headers["Content-Disposition"] == "attachment; filename=CQA-sample-en-004.pdf"
+    assert pdf.data.startswith(b"%PDF-") and pdf.data.rstrip().endswith(b"%%EOF")
+    assert client.get("/report/SAMPLE/nope?format=pdf").status_code == 404
+    assert client.get("/report/SAMPLE/sample-en-004?format=xls").status_code == 400
     assert client.get("/report/SAMPLE/nope").status_code == 404
 
 

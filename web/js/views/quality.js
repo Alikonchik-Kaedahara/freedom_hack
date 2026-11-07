@@ -1,6 +1,4 @@
-// Качество оценки: can the automatic evaluation be trusted? Three plain questions, one number each —
-// does it agree with people (manual markup), does it repeat itself (second opinions), how often do
-// reviewers overturn it (appeals) — and a ranked list of what operators get wrong most often.
+// Model verification in Settings: compare the original answers with people and with a second evaluation.
 import { h, icon, toast, fmtDate, pluralRu } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe } from '../store.js';
@@ -14,23 +12,36 @@ const langName = (code) => LANG[code] || code;
 const dialogLink = (cid) => h('a', { href: `#/dialog/${encodeURIComponent(cid)}`, class: 'mono-id' }, cid);
 const n = (count, one, few, many) => `${count} ${pluralRu(count, one, few, many)}`;
 
-export function renderQuality(root) {
+export function renderVerification(root) {
   const page = h('div', { class: 'page' });
   root.append(page);
   let data = null;
   let loading = true;
+  let sequence = 0;
+  if (!state.group) {
+    page.append(h('h2', null, 'Проверка модели'), h('p', { class: 'muted' }, 'Для проверки загрузите набор диалогов.'));
+    return;
+  }
 
   async function load() {
+    const request = ++sequence;
     loading = true;
     draw();
-    try { data = await api.quality(state.group); } catch (e) { toast(e.message, { type: 'error' }); data = null; }
+    try {
+      const latest = await api.quality(state.group, 'model');
+      if (request !== sequence) return;
+      data = latest;
+    } catch (e) {
+      if (request !== sequence) return;
+      toast(e.message, { type: 'error' }); data = null;
+    }
     loading = false;
     draw();
   }
 
   function draw() {
     const head = (sub, action) => h('div', { class: 'page-head' },
-      h('div', null, h('h1', null, 'Качество оценки'), h('div', { class: 'sub' }, sub)),
+      h('div', null, h('h2', null, 'Проверка модели'), h('div', { class: 'sub' }, sub)),
       h('div', { class: 'head-actions' }, action));
     if (loading && !data) { page.replaceChildren(head('Загрузка…'), h('div', { class: 'skeleton', style: { height: '180px' } })); return; }
     if (!data) {
@@ -39,9 +50,8 @@ export function renderQuality(root) {
       return;
     }
     page.replaceChildren(
-      head(`Можно ли доверять автоматической оценке: три проверки по ${n(data.evaluated, 'оценённому диалогу', 'оценённым диалогам', 'оценённым диалогам')} набора ${data.group}`, secondAllButton()),
-      h('div', { class: 'q-cards' }, peopleCard(data.calibration), repeatCard(data.reproducibility), appealsCard(data.appeals)),
-      h('div', { style: { marginTop: '12px' } }, patternsCard(data.patterns)));
+      head(`Сравнение с ручной разметкой и повторной оценкой · набор ${data.group} · ${n(data.evaluated, 'оценённый диалог', 'оценённых диалога', 'оценённых диалогов')}`, secondAllButton()),
+      h('div', { class: 'q-cards verification-cards' }, peopleCard(data.calibration), repeatCard(data.reproducibility)));
   }
 
   function secondAllButton() {
@@ -153,69 +163,12 @@ export function renderQuality(root) {
     return out;
   }
 
-  // ----- 3. appeals -----
-  function appealsCard(a) {
-    if (!a.total) {
-      return card('Как часто оценку пересматривают?', null, null, [
-        'Пока неизвестно: апелляций ещё не было.',
-        'Апелляцию подают из карточки диалога, у критерия. Когда проверяющие начнут менять оценки, здесь будет видно, по каким правилам система ошибается чаще.',
-      ]);
-    }
-    const decided = a.accepted + a.rejected;
-    const problem = a.perCriterion.filter((p) => p.accepted).sort((x, y) => y.accepted - x.accepted);
-    const details = h('details', { class: 'q-more' },
-      h('summary', null, 'По критериям'),
-      h('div', { class: 'q-list' }, a.perCriterion.map((p) => h('div', { class: 'q-item' },
-        h('div', { class: 'q-item-head' }, h('b', null, `${p.code} ${p.name}`),
-          h('span', { class: 'muted' }, ` — ${n(p.total, 'апелляция', 'апелляции', 'апелляций')}: принято ${p.accepted}, отклонено ${p.rejected}${p.pending ? `, ждут ${p.pending}` : ''}`))))));
-    return card('Как часто оценку пересматривают?', decided ? a.overturnRate : null, decided ? overturnWord(a.overturnRate) : null, [
-      `Подано ${n(a.total, 'апелляция', 'апелляции', 'апелляций')}: ${n(a.accepted, 'принята', 'приняты', 'принято')} — оценка изменена, ${n(a.rejected, 'отклонена', 'отклонены', 'отклонено')}${a.pending ? `, ${n(a.pending, 'ждёт', 'ждут', 'ждут')} решения` : ''}.`,
-      decided ? `Из рассмотренных пересмотрено ${pct(a.overturnRate)}.` : 'Решений пока нет — процент появится после первого.',
-      problem.length && problem[0].accepted >= 2 ? `Чаще всего меняют оценку по критерию ${problem[0].code} «${problem[0].name}» — стоит уточнить его правило.` : null,
-    ], details, null, decided ? (a.overturnRate <= 15 ? 'good' : a.overturnRate <= 40 ? 'mid' : 'bad') : 'none');
-  }
-
-  // ----- what operators get wrong -----
-  function patternsCard(p) {
-    const list = p.criteria.filter((c) => (c.type === 'flag' ? c.flag : c.failed + c.partial) > 0);
-    const rows = list.map((c) => {
-      const [first, ...rest] = c.examples;
-      const count = c.type === 'flag' ? c.flag : c.failed + c.partial;
-      const text = c.type === 'flag'
-        ? `грубая ошибка в ${n(c.flag, 'диалоге', 'диалогах', 'диалогах')} из ${p.dialogs}`
-        : `${c.failed ? `не выполнено в ${c.failed}` : ''}${c.failed && c.partial ? ', ' : ''}${c.partial ? `частично в ${c.partial}` : ''} из ${n(c.applicable, 'диалога', 'диалогов', 'диалогов')}, где критерий применим`;
-      const more = rest.length ? h('details', { class: 'q-more inline' }, h('summary', null, `ещё ${n(rest.length, 'пример', 'примера', 'примеров')}`),
-        rest.map((e) => example(e))) : null;
-      return h('div', { class: 'q-rank-row' },
-        h('div', { class: 'q-rank-main' },
-          h('div', { class: 'q-rank-title' }, h('span', { class: 'muted' }, c.code), h('b', null, c.name),
-            h('span', { class: `tag ${c.type === 'flag' || (c.share || 0) >= 50 ? 'red' : 'amber'}` }, c.type === 'flag' ? pct(c.share) : `${pct(c.share)}`)),
-          h('div', { class: 'muted' }, text[0].toUpperCase() + text.slice(1) + '.')),
-        h('div', { class: 'q-rank-ex' }, first ? example(first) : h('span', { class: 'muted' }, 'без примеров'), more));
-    });
-    return h('div', { class: 'card card-pad' },
-      h('h3', { class: 'card-title q-title' }, 'Что операторы нарушают чаще всего', h('span', { class: 'spacer' }),
-        h('span', { class: 'hint' }, `по ${n(p.dialogs, 'оценённому диалогу', 'оценённым диалогам', 'оценённым диалогам')} · от частого к редкому`)),
-      !list.length ? h('p', { class: 'muted' }, 'Нарушений нет.') : h('div', { class: 'q-rank' }, rows));
-  }
-
-  function example(e) {
-    return h('div', { class: 'p-quote' },
-      dialogLink(e.conversationId), e.turn ? h('span', { class: 'muted' }, ` · реплика ${e.turn}`) : null,
-      e.quote ? h('q', null, e.quote) : null,
-      h('div', { class: 'muted' }, e.explanation));
-  }
-
   load();
-  return subscribe((w) => { if (w === 'results' || (w === 'job' && !state.job)) load(); else if (w === 'job') draw(); });
+  const off = subscribe((w) => { if (w === 'results' || (w === 'job' && !state.job)) load(); else if (w === 'job') draw(); });
+  return () => { sequence++; off(); };
 }
 
 function verdictWord(rate) {
   if (rate == null) return '';
   return rate >= 85 ? 'хорошо' : rate >= 65 ? 'есть расхождения' : 'низкое совпадение';
-}
-
-function overturnWord(rate) {
-  if (rate == null) return '';
-  return rate <= 15 ? 'редко' : rate <= 40 ? 'иногда' : 'часто';
 }
