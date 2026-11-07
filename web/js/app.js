@@ -252,7 +252,6 @@ export async function mount(container, context = {}) {
   buildShell(root);
 
   window.addEventListener('hashchange', route);
-  subscribe((what) => { if (what === 'group') route(); else renderChrome(); });
   D365Bridge.listen({
     openDialog: (cid) => { location.hash = `#/dialog/${encodeURIComponent(cid)}`; },
     setGroup: (g) => loadGroup(g).catch((e) => toast(e.message, { type: 'error' })),
@@ -265,6 +264,7 @@ export async function mount(container, context = {}) {
   } catch {
     toast('Сервер CQA недоступен', { type: 'error', timeout: 10000 });
   }
+  subscribe((what) => { if (what === 'group') route(); else renderChrome(); });
   route();
   resumeJobs();
   D365Bridge.post('ready', { groupId: state.group });

@@ -5,6 +5,7 @@ import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 import { setRibbonAction } from '../app.js';
 
+const OPERATOR_SCORE_TARGET = 80;
 const SVGNS = 'http://www.w3.org/2000/svg';
 const MODEL_LABEL = { 'claude-opus-5-5': 'Claude Opus 5.5', 'claude-sonnet-5-5': 'Claude Sonnet 5.5', 'claude-haiku-5-5': 'Claude Haiku 5.5' };
 
@@ -114,7 +115,7 @@ function operatorStats(evaluated) {
   let weakest = null, min = Infinity, below = 0;
   for (const [name, p] of per) {
     const avg = p.sum / p.n;
-    if (avg < TARGET) below += 1;
+    if (avg < OPERATOR_SCORE_TARGET) below += 1;
     if (avg < min) { min = avg; weakest = name; }
   }
   return { total: per.size, below, weakest };
