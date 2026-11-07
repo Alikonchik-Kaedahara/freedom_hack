@@ -246,6 +246,9 @@ def validate(raw, checklist, record, known_facts=None):
         if confidence not in CONFIDENCE:
             confidence = "medium"
 
+        if c["type"] == "flag" and answer == "no" and not evidence:
+            # «грубой ошибки нет» is a verdict about every operator reply: record the checked section
+            evidence = [i for i, sp in enumerate(speakers) if sp == "operator"]
         needs_evidence = answer is not None and not (c["type"] == "flag" and answer == "no")
         if needs_evidence and not evidence:
             what = "реплики, где действие ожидалось" if answer in ("no", 0) else (

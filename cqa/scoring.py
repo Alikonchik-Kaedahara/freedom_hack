@@ -15,13 +15,30 @@ from decimal import ROUND_HALF_UP, Decimal
 
 
 def round2(x):
+    """Half-up to two decimals on the exact value: 25.5 / 80 * 100 is 31.874999999999996 in
+    floating point but 31.875 in arithmetic, so the float is first settled to nine decimals."""
     if x is None:
         return None
-    return float(Decimal(str(x)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+    exact = Decimal(str(x)).quantize(Decimal("1e-9"))
+    return float(exact.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
 
 
 def scale_max(c):
     return max([0] + [float(s.get("value", 0)) for s in c.get("scale", [])])
+
+
+def checked_turns(record):
+    """The checked section for «no gross error»: every operator reply (0-based indices)."""
+    return [i for i, t in enumerate(record.get("transcript") or []) if t.get("speaker") == "operator"]
+
+
+def evidence_of(answer, criterion, record):
+    """Evidence to show/export for an answer. A clean flag with no evidence from the model gets the
+    operator replies that were checked — the guide wants a verified fragment for every criterion."""
+    ev = list((answer or {}).get("evidence") or [])
+    if not ev and criterion.get("type") == "flag" and (answer or {}).get("answer") == "no" and record:
+        return checked_turns(record)
+    return ev
 
 
 def final_answers(result):

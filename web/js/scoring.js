@@ -5,13 +5,25 @@
 // 5. Total is rounded to 2 decimals; no applicable weighted criteria -> no total.
 //    Gross errors (flag criteria) are reported separately and give no points.
 
-export const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
+// Half-up to two decimals on the exact value: 25.5 / 80 * 100 is 31.874999999999996 in floating
+// point but 31.875 in arithmetic, so the float is first settled to nine decimals (mirrors cqa/scoring.py).
+export const round2 = (x) => Math.round(Math.round(x * 1e9) / 1e7) / 100;
 
 export function scaleMax(c) {
   return Math.max(0, ...(c.scale || []).map((s) => Number(s.value)));
 }
 
 /** Answers with accepted appeal decisions applied. */
+/** The checked section for «no gross error»: every operator reply (0-based indices). */
+export const checkedTurns = (record) => (record?.transcript || []).map((t, i) => (t.speaker === 'operator' ? i : -1)).filter((i) => i >= 0);
+
+/** Evidence to show for an answer; a clean flag without evidence shows the operator replies that were checked. */
+export function evidenceOf(ans, c, record) {
+  const ev = ans?.evidence || [];
+  if (!ev.length && c?.type === 'flag' && ans?.answer === 'no') return checkedTurns(record);
+  return ev;
+}
+
 export function finalAnswers(result) {
   const out = {};
   for (const [k, v] of Object.entries(result.answers || {})) out[k] = { ...v };

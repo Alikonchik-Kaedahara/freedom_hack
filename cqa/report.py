@@ -80,7 +80,7 @@ def render(record, result, team_name="", operator_name=""):
             pts = f'{p.get("effPoints", scoring.round2(p["points"]))} / {p.get("effWeight", c.get("weight"))}'
         else:
             pts = f'N/A · вес {c.get("weight")} перераспределён'
-        ev = "".join(quote(i) for i in (a.get("evidence") or [])[:4])
+        ev = "".join(quote(i) for i in scoring.evidence_of(a, c, record)[:4])
         contradicts = "".join(
             f'<div class="kb"><b>Противоречит справочнику {_esc(fid)}:</b> {_esc(facts[fid]["fact"])}</div>'
             for fid in a.get("contradicts") or [] if fid in facts)

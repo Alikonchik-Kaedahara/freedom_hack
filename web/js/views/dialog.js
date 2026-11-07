@@ -3,7 +3,7 @@
 import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate, moreMenu } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, resultFor, summaryFor, putResult, keyOf } from '../store.js';
-import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
+import { finalAnswers, score, verdictOf, round2, disputeLabel, evidenceOf, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
 import { openReview, byLine } from './appeals.js';
@@ -262,7 +262,7 @@ export function renderDialog(root, cid) {
     const appeals = (res.appeals || []).filter((a) => a.criterionId === c.id);
     const pending = appeals.find((a) => a.status === 'pending');
     const stIcon = { ok: 'check', fail: 'x', part: 'minus', na: 'minus', flag: 'alert', clean: 'check' }[status];
-    const ev = ans?.evidence || [];
+    const ev = evidenceOf(ans, c, rec);
 
     const toggle = () => {
       if (open.has(c.id)) { open.delete(c.id); highlight([], ''); } else { open.add(c.id); if (ev.length) jump(ev, status); }
@@ -273,7 +273,7 @@ export function renderDialog(root, cid) {
       ? h('span', { class: `verdict ${v.cls}` }, v.text, h('small', null, ` / ${v.max}`))
       : h('span', { class: `verdict ${v.cls}` }, v.text);
 
-    const evLabel = status === 'fail' ? 'Проверенный участок' : status === 'na' ? 'Основание' : 'Доказательство';
+    const evLabel = status === 'fail' ? 'Проверенный участок' : status === 'na' ? 'Основание' : status === 'clean' ? 'Проверенные реплики' : 'Доказательство';
     const dispute = disputeLabel(ans);
     const body = isOpen ? h('div', { class: 'crit-body' },
       ans?.explanation ? h('div', { class: 'expl' }, ans.explanation) : null,

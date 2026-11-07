@@ -418,3 +418,46 @@ def test_old_checklists_get_default_interpretations_on_read(fresh_storage):
     assert got["chat-base"]["criteria"][1]["interpretation"] == INTERPRETATIONS["c2"]
     assert got["call-base"]["criteria"][6]["interpretation"] == INTERPRETATIONS["c7"]
     assert got["custom"]["criteria"][0]["interpretation"] == "", "only the built-in rules have team readings"
+
+
+# ---------- Codex review: evidence for a clean flag, exact half-up rounding, arithmetic in check ----------
+
+def test_clean_flag_gets_checked_operator_turns():
+    rec, checklist, answers = sample_answers("sample-ru-001")
+    raw = copy.deepcopy(json.load(open(os.path.join(replay.SAMPLE_DIR, "answers.json"), encoding="utf-8"))["sample-ru-001"]["chat-base"])
+    raw["c8"] = {"verdict": "no", "evidence": [], "explanation": "Грубых нарушений нет.", "confidence": "high"}
+    answers, problems = evaluator.validate(raw, checklist, rec)
+    assert not problems
+    operator_turns = [i for i, t in enumerate(rec["transcript"]) if t["speaker"] == "operator"]
+    assert answers["c8"]["evidence"] == operator_turns and operator_turns
+    # stored results from before the rule still export and render with the checked replies
+    stored = {"answer": "no", "evidence": [], "explanation": "x"}
+    assert scoring.evidence_of(stored, checklist["criteria"][7], rec) == operator_turns
+    assert scoring.evidence_of({"answer": "yes", "evidence": [3]}, checklist["criteria"][7], rec) == [3]
+    assert scoring.evidence_of({"answer": "no", "evidence": []}, checklist["criteria"][0], rec) == [], "only the flag gets the fallback"
+
+
+def test_exported_critical_false_has_evidence_turns(client, monkeypatch):
+    from cqa import export
+    fake_cloud(monkeypatch)
+    evaluated_sample(client)
+    doc, report = export.build("SAMPLE", "Команда")
+    for r in doc["results"]:
+        for row in r["criteria"]:
+            assert row["evidence_turns"], f'{r["conversation_id"]}: {row["criterion_id"]} without evidence'
+    assert export.check(doc) == []
+
+
+def test_check_catches_wrong_total_and_missing_evidence():
+    from cqa import export
+    rows = [{"criterion_id": e, "value": v, "rationale": "r", "evidence_turns": [1]} for e, v in
+            [("contact", True), ("discovery", False), ("identification", None), ("consultation", 5), ("empathy", False), ("dialogue", 7), ("closure", False), ("critical", True)]]
+    assert export.recompute_total(rows) == 31.88, "25.5 / 80 × 100 = 31.875 rounds half-up"
+    doc = {"schema_version": "1.0", "team_name": "T", "model": {"mode": "external_api", "name": "m"},
+           "results": [{"conversation_id": "x", "status": "ok", "criteria": rows, "score": {"final_score": 31.87, "critical_flag": True}}]}
+    problems = export.check(doc)
+    assert any("не сходится" in p for p in problems), problems
+    doc["results"][0]["score"]["final_score"] = 31.88
+    assert export.check(doc) == []
+    rows[7]["evidence_turns"] = []
+    assert any("evidence_turns пустой" in p for p in export.check(doc))

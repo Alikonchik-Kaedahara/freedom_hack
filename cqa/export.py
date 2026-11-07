@@ -62,7 +62,7 @@ def _value(criterion, answer, eid):
     return ans == "yes", None
 
 
-def _criteria_rows(result):
+def _criteria_rows(result, record=None):
     """Eight criterion rows in the fixed order, or raise ExportError for an unexportable result."""
     checklist = result["checklist"]
     answers = scoring.final_answers(result)
@@ -85,7 +85,7 @@ def _criteria_rows(result):
             "criterion_id": eid,
             "value": value,
             "rationale": rationale,
-            "evidence_turns": [int(i) + 1 for i in (a.get("evidence") or [])],
+            "evidence_turns": [int(i) + 1 for i in scoring.evidence_of(a, c, record)],
         }
     missing = [eid for eid in EXPORT_IDS if eid not in rows]
     if missing:
@@ -147,7 +147,7 @@ def build(group_id, team_name, allow_replay=False):
                 report["errors"][cid] = "replay"
                 continue
         try:
-            criteria = _criteria_rows(res)
+            criteria = _criteria_rows(res, rec)
         except ExportError as e:
             out.append({"conversation_id": cid, "status": "error", "criteria": [], "score": None, "error": str(e)})
             report["error"] += 1
@@ -188,6 +188,36 @@ def write(group_id, dataset, team_name, allow_replay=False):
     report["path"] = os.path.relpath(path, ROOT)
     report["writtenAt"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return doc, report
+
+
+def recompute_total(rows):
+    """final_score from the exported values with the organizers' weights and scales (None if a value is odd)."""
+    from .defaults import DEFAULT_CHECKLISTS
+
+    by_eid = {}
+    for c in DEFAULT_CHECKLISTS[0]["criteria"]:
+        eid = export_id(c)
+        if eid:
+            by_eid[eid] = c
+    answers = {}
+    for row in rows:
+        c = by_eid.get(row.get("criterion_id"))
+        if not c:
+            return None
+        v = row.get("value")
+        if str(row.get("rationale") or "").startswith("N/A по чек-листу системы"):
+            answers[c["id"]] = {"answer": "na"}  # the format had no null here; the score excluded the criterion
+        elif c["type"] == "flag":
+            answers[c["id"]] = {"answer": "yes" if v else "no"}
+        elif v is None:
+            answers[c["id"]] = {"answer": "na"}
+        elif isinstance(v, bool):
+            answers[c["id"]] = {"answer": "yes" if v else "no"}
+        elif isinstance(v, (int, float)):
+            answers[c["id"]] = {"answer": v}
+        else:
+            return None
+    return scoring.score({"criteria": list(by_eid.values())}, answers)["total"]
 
 
 def check(doc, expected_count=None):
@@ -239,6 +269,13 @@ def check(doc, expected_count=None):
             problems.append(f"{cid}: final_score должен быть числом 0..100")
         elif round(fs, 2) != fs:
             problems.append(f"{cid}: final_score должен быть округлён до двух знаков")
+        else:
+            expected = recompute_total(rows)
+            if expected is not None and abs(expected - fs) > 1e-9:
+                problems.append(f"{cid}: final_score {fs} не сходится с критериями по весам чек-листа ({expected})")
+        for row in rows:
+            if row.get("value") is not None and not row.get("evidence_turns"):
+                problems.append(f"{cid}: {row.get('criterion_id')} — нет реплик-доказательств (evidence_turns пустой)")
         crit = next((row.get("value") for row in rows if row.get("criterion_id") == "critical"), None)
         if score.get("critical_flag") != crit:
             problems.append(f"{cid}: critical_flag должен совпадать со значением critical")

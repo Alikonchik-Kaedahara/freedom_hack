@@ -162,7 +162,13 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            15,
+            17,
+            19
+          ]
         }
       ],
       "score": {
@@ -242,7 +248,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            15
+          ]
         }
       ],
       "score": {
@@ -325,7 +335,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -410,7 +424,12 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            16
+          ]
         }
       ],
       "score": {
@@ -490,7 +509,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            13,
+            15
+          ]
         }
       ],
       "score": {
@@ -571,7 +594,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13
+          ]
         }
       ],
       "score": {
@@ -652,7 +678,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -824,7 +854,18 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия данных без идентификации не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            16,
+            19,
+            21,
+            23,
+            26,
+            28,
+            30,
+            32
+          ]
         }
       ],
       "score": {
@@ -905,7 +946,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -1068,7 +1113,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -1149,7 +1197,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -1228,7 +1280,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -1310,7 +1365,12 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            16
+          ]
         }
       ],
       "score": {
@@ -1391,7 +1451,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            15
+          ]
         }
       ],
       "score": {
@@ -1471,7 +1535,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложения платной услуги в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -1553,7 +1620,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -1635,7 +1706,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -1962,7 +2037,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -2126,7 +2205,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -2217,7 +2299,15 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            15,
+            17,
+            20,
+            22,
+            24
+          ]
         }
       ],
       "score": {
@@ -2300,7 +2390,12 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14,
+            16
+          ]
         }
       ],
       "score": {
@@ -2463,7 +2558,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -2627,7 +2726,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -2881,7 +2984,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -2961,7 +3068,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3040,7 +3150,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3121,7 +3234,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3206,7 +3322,13 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            16,
+            18,
+            20
+          ]
         }
       ],
       "score": {
@@ -3289,7 +3411,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3374,7 +3499,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3455,7 +3583,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -3544,7 +3676,7 @@
         }
       ],
       "score": {
-        "final_score": 31.87,
+        "final_score": 31.88,
         "critical_flag": true
       }
     },
@@ -3619,7 +3751,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -3946,7 +4081,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -4027,7 +4165,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -4109,7 +4251,11 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
@@ -4196,7 +4342,17 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия данных без идентификации не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            14,
+            16,
+            19,
+            21,
+            23,
+            26,
+            28,
+            30
+          ]
         }
       ],
       "score": {
@@ -4277,7 +4433,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -4366,7 +4525,13 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            11,
+            13,
+            16,
+            18,
+            20
+          ]
         }
       ],
       "score": {
@@ -4446,7 +4611,9 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10
+          ]
         }
       ],
       "score": {
@@ -4607,7 +4774,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений платных услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -4686,7 +4856,10 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании и раскрытия конфиденциальных данных нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12
+          ]
         }
       ],
       "score": {
@@ -4940,11 +5113,15 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия данных не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            10,
+            12,
+            14
+          ]
         }
       ],
       "score": {
-        "final_score": 31.87,
+        "final_score": 31.88,
         "critical_flag": false
       }
     },
@@ -5036,7 +5213,33 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия данных без идентификации нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            13,
+            19,
+            20,
+            22,
+            27,
+            31,
+            32,
+            38,
+            39,
+            40,
+            42,
+            45,
+            48,
+            49,
+            54,
+            59,
+            61,
+            65,
+            66,
+            68,
+            70,
+            71,
+            73,
+            75,
+            76
+          ]
         }
       ],
       "score": {
@@ -5121,7 +5324,59 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, предложений услуг в обход компании или раскрытия данных без идентификации не выявлено.",
-          "evidence_turns": []
+          "evidence_turns": [
+            3,
+            6,
+            8,
+            10,
+            12,
+            15,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35,
+            36,
+            37,
+            38,
+            39,
+            40,
+            41,
+            42,
+            43,
+            44,
+            45,
+            46,
+            48,
+            49,
+            50,
+            51,
+            52,
+            53,
+            54,
+            55,
+            56,
+            57,
+            58,
+            60,
+            62,
+            64,
+            66,
+            67,
+            69,
+            71
+          ]
         }
       ],
       "score": {
@@ -5207,7 +5462,21 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений или раскрытия конфиденциальной информации нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            13,
+            15,
+            17,
+            24,
+            26,
+            27,
+            28,
+            30,
+            31,
+            36,
+            38,
+            40,
+            43
+          ]
         }
       ],
       "score": {
@@ -5399,7 +5668,47 @@
           "criterion_id": "critical",
           "value": false,
           "rationale": "Оскорблений, личных платных предложений и раскрытия данных без идентификации нет.",
-          "evidence_turns": []
+          "evidence_turns": [
+            15,
+            18,
+            23,
+            26,
+            28,
+            30,
+            32,
+            34,
+            36,
+            38,
+            39,
+            47,
+            49,
+            51,
+            54,
+            56,
+            58,
+            61,
+            63,
+            64,
+            67,
+            69,
+            71,
+            73,
+            77,
+            79,
+            81,
+            84,
+            87,
+            90,
+            94,
+            95,
+            98,
+            100,
+            103,
+            107,
+            110,
+            112,
+            115
+          ]
         }
       ],
       "score": {
