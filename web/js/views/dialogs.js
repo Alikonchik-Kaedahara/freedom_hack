@@ -155,7 +155,7 @@ export function renderDialogs(root) {
     if (s?.gross) tags.push(h('span', { class: 'tag red' }, icon('shield', 12), 'Критично'));
     if (s?.pending) tags.push(h('span', { class: 'tag amber' }, icon('scale', 14), 'Апелляция'));
     else if (s?.changed) tags.push(h('span', { class: 'tag green' }, 'Пересмотрен'));
-    if (s?.disputed?.length) tags.push(h('span', { class: 'tag amber', title: 'Критерии с низкой уверенностью или непройденной проверкой' }, icon('alert', 14), `Спорно · ${s.disputed.length}`));
+    if (s?.disputed?.length) tags.push(h('span', { class: 'tag amber', title: 'Критерии с низкой уверенностью, непройденной проверкой или расхождением второго мнения' }, icon('alert', 14), `Спорно · ${s.disputed.length}`));
     const cb = h('input', {
       type: 'checkbox', class: 'cb', checked: selected.has(cid), 'aria-label': `Выбрать ${cid}`,
       onclick: (e) => { e.stopPropagation(); e.target.checked ? selected.add(cid) : selected.delete(cid); drawHead(); },

@@ -27,6 +27,24 @@ export async function startEvaluation(ids, { checklistId } = {}) {
   }
 }
 
+/** Second opinion for already-evaluated dialogs. engine: 'cloud' | 'local' | undefined (current). */
+export async function startSecondOpinion(ids, engine) {
+  if (!ids.length) return;
+  if (state.job && state.job.status === 'running') {
+    toast('Дождитесь окончания текущей оценки', { type: 'error' });
+    return;
+  }
+  try {
+    const job = await api.secondOpinion({ groupId: state.group, conversationIds: ids, engine });
+    track(job);
+  } catch (e) {
+    toast(e.message, {
+      type: 'error',
+      action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/model') } : null,
+    });
+  }
+}
+
 export async function resumeJobs() {
   try {
     const running = await api.jobs();
@@ -80,6 +98,10 @@ function finish(j) {
     toast(j.errors[0]?.message || 'Оценка не удалась', { type: 'error', timeout: 8000 });
   } else if (j.failed) {
     toast(`Оценено ${j.done}, с ошибкой ${j.failed}: ${j.errors[0]?.message || ''}`, { type: 'error', timeout: 8000 });
+  } else if (j.kind === 'second') {
+    toast(j.needsReview
+      ? `Второе мнение получено для ${j.done} ${pluralRu(j.done, 'диалога', 'диалогов', 'диалогов')}; расхождения в ${j.needsReview} ${pluralRu(j.needsReview, 'диалоге', 'диалогах', 'диалогах')} помечены как спорные`
+      : `Второе мнение получено для ${j.done} ${pluralRu(j.done, 'диалога', 'диалогов', 'диалогов')}: вердикты совпали полностью`, { timeout: 7000 });
   } else if (j.needsReview) {
     toast(`Готово: ${j.done} ${pluralRu(j.done, 'диалог оценён', 'диалога оценено', 'диалогов оценено')}; в ${j.needsReview} ${pluralRu(j.needsReview, 'диалоге', 'диалогах', 'диалогах')} есть критерии, требующие проверки`, { timeout: 7000 });
   } else {
@@ -96,7 +118,7 @@ function renderDock() {
   dock.append(h('div', { class: 'job-dock' },
     h('div', { class: 'row' },
       h('span', { class: 'spinner' }),
-      h('b', null, 'Оценка диалогов'),
+      h('b', null, j.kind === 'second' ? 'Второе мнение' : 'Оценка диалогов'),
       h('span', { class: 'cnt' }, `${finished} из ${j.total}`)),
     h('div', { class: 'bar' }, h('i', { style: { width: `${Math.max(pct, 3)}%` } }))));
 }

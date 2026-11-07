@@ -55,6 +55,8 @@ def test_disputed_and_rounding():
                           "c2": {"answer": "no", "confidence": "low"},
                           "c3": {"answer": None, "needsReview": True}}}
     assert scoring.disputed(result) == ["c2", "c3"]
+    result["secondOpinion"] = {"comparison": {"agree": ["c1"], "disagree": ["c7"], "near": ["c4", "c2"]}}
+    assert scoring.disputed(result) == ["c2", "c3", "c7", "c4"], "mirrors web/js/scoring.js"
     assert scoring.round2(81.875) == 81.88
     assert scoring.round2(2.675) == 2.68
     assert scoring.round2(None) is None

@@ -4,7 +4,7 @@ import json
 import os
 import threading
 
-from .defaults import DEFAULT_CHECKLISTS, DEFAULT_SETTINGS
+from .defaults import DEFAULT_CHECKLISTS, DEFAULT_SETTINGS, INTERPRETATIONS
 
 ROOT = os.environ.get("CQA_STORAGE_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
 _lock = threading.RLock()
@@ -80,7 +80,14 @@ def get_record(group_id, conversation_id):
 # ---------- checklists ----------
 
 def get_checklists():
-    return _read("checklists", DEFAULT_CHECKLISTS)
+    checklists = _read("checklists", DEFAULT_CHECKLISTS)
+    # Checklists saved before the field existed get the team's readings of the built-in rules
+    # (only where the key is absent: a field the user cleared on purpose stays empty).
+    for cl in checklists:
+        for c in cl.get("criteria") or []:
+            if "interpretation" not in c:
+                c["interpretation"] = INTERPRETATIONS.get(c["id"], "") if cl.get("id") in ("chat-base", "call-base") else ""
+    return checklists
 
 
 def get_checklist(checklist_id):

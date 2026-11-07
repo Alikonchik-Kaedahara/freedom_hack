@@ -13,13 +13,19 @@ import { renderDialog } from './views/dialog.js';
 import { renderAppeals } from './views/appeals.js';
 import { renderChecklists } from './views/checklists.js';
 import { renderModel } from './views/model.js';
+import { renderQuality } from './views/quality.js';
+import { renderOperators } from './views/operators.js';
+import { renderKnowledge } from './views/knowledge.js';
 
 const NAV = [
   { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid', rail: 'home' },
   { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list', rail: 'clockR' },
   { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', rail: 'bookmark', badge: () => pendingAppeals().length },
   { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks', rail: 'headset' },
-  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu', rail: 'gear' },
+  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu', rail: 'gear', more: true },
+  { path: '/quality', label: 'Качество', short: 'Качество', icon: 'target', more: true },
+  { path: '/operators', label: 'Операторы', short: 'Операторы', icon: 'headset', more: true },
+  { path: '/knowledge', label: 'Справочник', short: 'Справочник', icon: 'database', more: true },
 ];
 
 const ROUTES = [
@@ -29,6 +35,9 @@ const ROUTES = [
   [/^\/appeals$/, renderAppeals],
   [/^\/checklists(?:\/(.+))?$/, renderChecklists],
   [/^\/model$/, renderModel],
+  [/^\/quality$/, renderQuality],
+  [/^\/operators(?:\/(.+))?$/, renderOperators],
+  [/^\/knowledge$/, renderKnowledge],
 ];
 
 const HOST_KEY = 'cqa.hostPreview';
@@ -114,15 +123,29 @@ function renderChrome() {
     return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', title: item.label },
       icon(item.rail || item.icon, 20), h('span', null, item.short), badge ? h('span', { class: 'badge' }, badge) : null);
   }));
-  ui.tabbar.replaceChildren(...NAV.map((item) => {
+  const more = NAV.filter((item) => item.more);
+  const moreActive = more.some((item) => isActive(item, path));
+  ui.tabbar.replaceChildren(...NAV.filter((item) => !item.more).map((item) => {
     const badge = item.badge ? item.badge() : 0;
     return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
       h('span', { class: 'tab-icon' }, icon(item.icon, 21), badge ? h('span', { class: 'dot' }, badge) : null),
       h('span', { class: 'tab-label' }, item.short));
-  }));
+  }), h('a', { href: '#', class: `tab-more ${moreActive ? 'active' : ''}`, onclick: (e) => { e.preventDefault(); openMoreSheet(more, path); } },
+    h('span', { class: 'tab-icon' }, icon('waffle', 21)), h('span', { class: 'tab-label' }, moreActive ? more.find((item) => isActive(item, path)).short : 'Ещё')));
   const ds = state.datasets.find((d) => d.groupId === state.group);
   ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'Набор:'), h('span', { class: 'mono' }, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
   ui.root.classList.toggle('no-data', !state.group);
+}
+
+/** Phone-only: the secondary sections behind the «Ещё» tab. */
+function openMoreSheet(items, path) {
+  const existing = ui.root.querySelector('.more-sheet');
+  if (existing) { existing.remove(); return; }
+  const sheet = h('div', { class: 'more-sheet' }, items.map((item) => h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', onclick: () => sheet.remove() },
+    icon(item.icon, 18), h('span', null, item.label))));
+  const dismiss = (e) => { if (!sheet.contains(e.target) && !ui.tabbar.contains(e.target)) { sheet.remove(); document.removeEventListener('mousedown', dismiss, true); } };
+  setTimeout(() => document.addEventListener('mousedown', dismiss, true), 0);
+  ui.root.append(sheet);
 }
 
 function route() {
@@ -132,6 +155,7 @@ function route() {
   currentPath = path;
   setRibbonAction(null);
   renderChrome();
+  ui.root.querySelector('.more-sheet')?.remove();
   clear(ui.view);
   D365Bridge.post('route', { path });
   if (!state.group) { cleanup = renderImportStage(ui.view) || null; return; }

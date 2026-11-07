@@ -21,9 +21,9 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import requests
-from flask import Flask, abort, jsonify, request, send_file, send_from_directory
+from flask import Flask, Response, abort, jsonify, request, send_file, send_from_directory
 
-from cqa import export, replay, scoring, storage
+from cqa import export, knowledge, operators, quality, replay, scoring, second, storage
 from cqa.evaluator import EvaluationError, check_engine, evaluate
 from cqa.validation import ValidationError, validate_checklist, validate_group_id, validate_records
 
@@ -364,6 +364,7 @@ def _run_one(job_id, group_id, cid, override_id):
         answers, usage, engine, meta = evaluate(record, checklist, settings)
         result = {
             "key": storage.result_key(group_id, cid), "groupId": group_id, "conversationId": cid,
+            "language": record.get("language"), "channel": record.get("channel"),
             "checklist": checklist, "answers": answers, "appeals": [],
             "engine": engine, "usage": usage, "durationMs": int((time.time() - started) * 1000),
             "attempts": meta["attempts"], "promptHash": meta["promptHash"], "unresolved": meta["unresolved"],
@@ -432,6 +433,98 @@ def start_evaluation():
     return jsonify(JOBS[job_id])
 
 
+def _engine_settings(settings, engine_override):
+    """Settings for a second pass: same engine by default, or the one asked for (cloud / local)."""
+    if not engine_override:
+        return settings
+    s = dict(settings)
+    s["engine"] = engine_override
+    return s
+
+
+def _run_second(job_id, group_id, cid, engine_override):
+    """Second opinion: evaluate again, store next to the original, flag disagreements."""
+    job = JOBS[job_id]
+    settings = _engine_settings(storage.get_settings(), engine_override)
+    record = storage.get_record(group_id, cid)
+    key = storage.result_key(group_id, cid)
+    with _jobs_lock:
+        job["current"].append(cid)
+    try:
+        if not record:
+            raise EvaluationError("Диалог не найден")
+        current = storage.get_result(key)
+        if not current:
+            raise EvaluationError("Сначала нужна первая оценка")
+        answers, usage, engine, meta = evaluate(record, current["checklist"], settings)
+
+        def attach(result):
+            second.attach(result, answers, usage, engine, meta, now())
+            return _with_score(result)
+
+        updated = storage.update_result(key, attach)
+        cmp = updated["secondOpinion"]["comparison"]
+        with _jobs_lock:
+            job["done"] += 1
+            if cmp["disagree"] or cmp["near"]:
+                job["needsReview"] += 1
+    except EvaluationError as e:
+        with _jobs_lock:
+            job["failed"] += 1
+            job["errors"].append({"conversationId": cid, "message": str(e)})
+    except Exception as e:  # keep the batch going
+        with _jobs_lock:
+            job["failed"] += 1
+            job["errors"].append({"conversationId": cid, "message": f"Ошибка: {e}"})
+    finally:
+        with _jobs_lock:
+            job["current"].remove(cid)
+            if job["done"] + job["failed"] >= job["total"]:
+                job["status"] = "finished"
+                job["finishedAt"] = now()
+
+
+@app.post("/api/second-opinion")
+def start_second_opinion():
+    """Run a second evaluation for already-evaluated dialogs. Body: {groupId, conversationIds, engine?}."""
+    body = body_json()
+    if body is None:
+        return bad("Ожидается JSON с полями groupId и conversationIds")
+    group_id = body.get("groupId")
+    ids = body.get("conversationIds")
+    if not group_id or not isinstance(ids, list) or not ids or not all(isinstance(i, str) and i for i in ids):
+        return bad("Нет диалогов для второго мнения")
+    engine_override = body.get("engine")
+    if engine_override not in (None, "", "cloud", "local"):
+        return bad("Движок второго мнения: cloud или local")
+    engine_override = engine_override or None
+    results = storage.get_results(group_id)
+    missing = [i for i in ids if storage.result_key(group_id, i) not in results]
+    if missing:
+        return bad(f"Сначала оцените диалоги: {', '.join(missing[:5])}" + (" …" if len(missing) > 5 else ""))
+    settings = _engine_settings(storage.get_settings(), engine_override)
+    if settings.get("engine") == "replay":
+        return bad("Для второго мнения нужна реальная модель (cloud или local), replay только воспроизводит сохранённый ответ", 412)
+    status = check_engine(settings)
+    if not status["ok"]:
+        return bad(status["message"], 412)
+    ids = list(dict.fromkeys(ids))
+    job_id = uuid.uuid4().hex[:10]
+    JOBS[job_id] = {"id": job_id, "kind": "second", "engine": settings.get("engine"), "total": len(ids), "done": 0, "failed": 0,
+                    "needsReview": 0, "errors": [], "current": [], "status": "running", "startedAt": now(),
+                    "groupId": group_id, "ids": ids}
+    workers = 1 if settings.get("engine") == "local" else 4
+    sem = threading.Semaphore(workers)
+
+    def run(cid):
+        with sem:
+            _run_second(job_id, group_id, cid, engine_override)
+
+    for cid in ids:
+        _pool.submit(run, cid)
+    return jsonify(JOBS[job_id])
+
+
 @app.get("/api/jobs/<job_id>")
 def job(job_id):
     j = JOBS.get(job_id)
@@ -441,6 +534,115 @@ def job(job_id):
 @app.get("/api/jobs")
 def jobs():
     return jsonify([j for j in JOBS.values() if j["status"] == "running"])
+
+
+# ---------- quality of the evaluation (calibration, reproducibility, appeals, patterns) ----------
+
+@app.get("/api/quality")
+def quality_overview():
+    group_id = request.args.get("group")
+    if not group_id:
+        return bad("Укажите набор: ?group=DEV")
+    return jsonify(quality.overview(group_id))
+
+
+@app.post("/api/quality/calibration")
+def upload_calibration():
+    """The team's manual markup: Калибровка_CQA.xlsx (sheet «Разметка») or JSON {entries: [...]}."""
+    try:
+        if "file" in request.files:
+            f = request.files["file"]
+            data = f.read()
+            name = (f.filename or "").lower()
+            entries = quality.parse_xlsx(data) if name.endswith(".xlsx") else quality.parse_json(data)
+            source = f.filename or "upload"
+        else:
+            body = body_json()
+            if body is None or not isinstance(body.get("entries"), list):
+                return bad("Ожидается файл .xlsx/.json или JSON с полем entries")
+            entries, source = body["entries"], "api"
+    except (ValueError, KeyError) as e:
+        return bad(f"Не удалось прочитать разметку: {e}")
+    except Exception as e:  # malformed workbook
+        return bad(f"Не удалось прочитать файл: {e}")
+    doc = quality.save_calibration(entries, now(), source)
+    return jsonify({"entries": len(doc["entries"]), "updatedAt": doc["updatedAt"], "source": doc["source"]})
+
+
+@app.delete("/api/quality/calibration")
+def clear_calibration():
+    quality.save_calibration([], now(), "")
+    return jsonify({"ok": True})
+
+
+# ---------- operators ----------
+
+@app.get("/api/operators")
+def operators_list():
+    group_id = request.args.get("group")
+    if not group_id:
+        return bad("Укажите набор: ?group=DEV")
+    return jsonify(operators.profiles(storage.get_dataset(group_id), storage.get_results(group_id)))
+
+
+@app.put("/api/results/<path:key>/operator")
+def set_operator(key):
+    """Supervisor override of the operator name for one dialog (empty = back to automatic)."""
+    body = body_json()
+    if body is None:
+        return bad("Ожидается JSON с полем name")
+    name = str(body.get("name") or "").strip()[:60]
+
+    def patch(result):
+        if name:
+            result["operatorName"] = name
+        else:
+            result.pop("operatorName", None)
+        return result
+
+    res = storage.update_result(key, patch)
+    return jsonify(res) if res else bad("Оценка не найдена", 404)
+
+
+# ---------- knowledge base ----------
+
+@app.get("/api/knowledge")
+def knowledge_get():
+    kb = knowledge.get()
+    group_id = request.args.get("group")
+    hits = knowledge.usage(storage.get_results(group_id), kb) if group_id else {}
+    return jsonify({**kb, "usage": hits, "edited": bool(storage._read("knowledge", None))})
+
+
+@app.put("/api/knowledge")
+def knowledge_put():
+    body = body_json()
+    if body is None:
+        return bad("Ожидается JSON справочника")
+    try:
+        return jsonify(knowledge.save(body))
+    except ValueError as e:
+        return bad(str(e))
+
+
+@app.post("/api/knowledge/reset")
+def knowledge_reset():
+    return jsonify(knowledge.reset())
+
+
+# ---------- printable report ----------
+
+@app.get("/report/<group_id>/<path:conversation_id>")
+def report(group_id, conversation_id):
+    """Self-contained HTML of one evaluated dialog for printing / Save as PDF."""
+    from cqa import report as report_mod
+
+    record = storage.get_record(group_id, conversation_id)
+    result = storage.get_result(storage.result_key(group_id, conversation_id))
+    if not record or not result:
+        abort(404)
+    html_text = report_mod.render(record, result, team_name(), operators.operator_of(record, result))
+    return Response(html_text, mimetype="text/html; charset=utf-8")
 
 
 # ---------- export in the organizers' format ----------

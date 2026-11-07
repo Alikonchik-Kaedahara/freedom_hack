@@ -4,7 +4,7 @@ import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate 
 import { api } from '../api.js';
 import { state, subscribe, resultFor, summaryFor, putResult } from '../store.js';
 import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
-import { startEvaluation, isRunning } from '../jobs.js';
+import { startEvaluation, startSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
 import { openReview } from './appeals.js';
 import { setRibbonAction } from '../app.js';
@@ -131,9 +131,65 @@ export function renderDialog(root, cid) {
           h('h1', null, 'Диалог ', h('span', { class: 'mono' }, cid)),
           h('div', { class: 'sub' }, `${channelLabel(rec.channel)} · ${rec.language}`))),
       h('div', { class: 'head-actions' },
+        res ? h('a', { class: 'btn btn-glass', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank', rel: 'noopener', title: 'Отчёт для печати / PDF' },
+          icon('download', 15), h('span', { class: 'btn-label' }, 'Отчёт')) : null,
+        res ? h('button', { class: 'btn btn-glass', disabled: running, title: res.secondOpinion ? 'Запросить второе мнение ещё раз' : 'Повторная оценка для проверки воспроизводимости', onclick: () => openSecondOpinion(cid), 'aria-label': 'Второе мнение' },
+          icon('refresh', 15), h('span', { class: 'btn-label' }, res.secondOpinion ? 'Второе мнение ✓' : 'Второе мнение')) : null,
         res
-          ? h('button', { class: 'btn btn-glass', disabled: running, onclick: () => startEvaluation([cid]), 'aria-label': 'Переоценить' }, icon('refresh', 15), h('span', { class: 'btn-label' }, 'Переоценить'))
+          ? h('button', { class: 'btn btn-glass', disabled: running, onclick: () => startEvaluation([cid]), 'aria-label': 'Переоценить' }, icon('sparkles', 15), h('span', { class: 'btn-label' }, 'Переоценить'))
           : mkEval())));
+  }
+
+  // Second opinion: same engine (reproducibility) or the other one (cloud vs local). Disagreements become disputed.
+  function openSecondOpinion(cid) {
+    const s = state.settings || {};
+    const current = s.engine === 'local' ? 'local' : 'cloud';
+    const other = current === 'cloud' ? 'local' : 'cloud';
+    const label = (e) => (e === 'cloud' ? `Облачная · ${s.cloud?.model || 'Claude'}` : `Локальная · ${s.local?.model || 'Ollama'}`);
+    let choice = current;
+    const seg = h('div', { class: 'segmented' },
+      h('button', { type: 'button', class: 'on', onclick: (e) => { choice = current; [...seg.children].forEach((b) => b.classList.toggle('on', b === e.currentTarget)); } }, `Та же модель · ${label(current)}`),
+      h('button', { type: 'button', onclick: (e) => { choice = other; [...seg.children].forEach((b) => b.classList.toggle('on', b === e.currentTarget)); } }, `Другая · ${label(other)}`));
+    const go = h('button', { class: 'btn btn-primary' }, icon('refresh', 15), 'Запросить');
+    const m = openModal({
+      title: 'Второе мнение',
+      sub: 'Диалог оценивается повторно; исходная оценка не меняется. Критерии, по которым ответы разошлись, помечаются как спорные и попадают к проверяющему.',
+      body: h('div', { class: 'field' }, h('label', null, 'Чем оценивать'), seg,
+        h('div', { class: 'muted', style: { marginTop: '8px' } }, 'Та же модель — проверка воспроизводимости. Другая модель — независимое мнение (облако против локальной).')),
+      footer: [h('button', { class: 'btn btn-ghost', onclick: () => m.close() }, 'Отмена'), go],
+    });
+    go.addEventListener('click', () => { m.close(); startSecondOpinion([cid], choice); });
+  }
+
+  function secondOpinionNote(res, c) {
+    const so = res.secondOpinion;
+    if (!so) return null;
+    const d = so.comparison?.details?.[c.id];
+    if (!d) return null;
+    const second = so.answers?.[c.id];
+    const v2 = verdictOf(c, d.second);
+    if (d.status === 'agree') {
+      return h('div', { class: 'so-note agree' }, icon('check', 13), `Второе мнение (${so.engine?.model || so.engine?.type}): совпало — ${v2.text}`);
+    }
+    return h('div', { class: `so-note ${d.status === 'near' ? 'near' : 'disagree'}` },
+      icon('alert', 13),
+      h('div', null,
+        h('b', null, d.status === 'near' ? 'Второе мнение: соседняя ступень — ' : 'Второе мнение расходится — '), `${v2.text}`,
+        h('span', { class: 'muted' }, ` (${so.engine?.model || so.engine?.type})`),
+        second?.explanation ? h('div', { class: 'so-expl' }, second.explanation) : null));
+  }
+
+  function knowledgeNote(ans) {
+    const ids = ans?.contradicts || [];
+    if (!ids.length) return null;
+    const facts = state.knowledge?.facts || [];
+    return h('div', { class: 'kb-note' }, icon('alert', 13),
+      h('div', null, h('b', null, 'Противоречие справочнику фактов'),
+        ids.map((id) => {
+          const f = facts.find((x) => x.id === id);
+          return h('div', { class: 'kb-fact' }, h('span', { class: 'mono' }, id), ' ', f ? f.fact : '— факт не найден в текущем справочнике');
+        }),
+        h('a', { href: '#/knowledge', class: 'link-btn', style: { fontSize: '12px', marginTop: '4px' } }, 'Открыть справочник')));
   }
 
   function drawBanner() {
@@ -223,6 +279,11 @@ export function renderDialog(root, cid) {
       dispute ? h('div', { class: `dispute ${dispute.cls}` },
         icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
       ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность модели: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
+      secondOpinionNote(res, c),
+      knowledgeNote(ans),
+      interpretationOf(res, c) ? h('details', { class: 'interp' },
+        h('summary', null, icon('checks', 13), 'Наша трактовка правила'),
+        h('div', { class: 'interp-body' }, interpretationOf(res, c))) : null,
       ev.length ? h('div', null,
         h('div', { class: 'ev-label' }, evLabel),
         h('div', { class: 'ev-list' }, ev.map((i) =>
@@ -326,4 +387,12 @@ const isMobile = () => window.matchMedia('(max-width: 820px)').matches;
 function activeChecklistName(rec) {
   const id = state.settings?.active?.[rec.channel];
   return state.checklists.find((c) => c.id === id)?.name || '—';
+}
+
+/** The team's reading of a rule: from the checklist copy stored with the result, else from the current checklist
+ *  (results evaluated before the field existed still show it). */
+function interpretationOf(res, c) {
+  if (c.interpretation) return c.interpretation;
+  const live = state.checklists.find((x) => x.id === res.checklist?.id);
+  return live?.criteria.find((x) => x.id === c.id)?.interpretation || '';
 }

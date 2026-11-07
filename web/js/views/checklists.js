@@ -132,6 +132,9 @@ export function renderChecklists(root, id) {
           h('input', { type: 'checkbox', checked: !!c.naAllowed, onchange: (e) => { c.naAllowed = e.target.checked; markDirty(); } }),
           h('span', { class: 'track' }), 'Разрешить N/A'),
         c.naAllowed ? h('textarea', { class: 'textarea', rows: 2, value: c.naRule || '', placeholder: 'Условие N/A: когда критерий неприменим', oninput: (e) => set('naRule', e.target.value) }) : null) : null,
+      // Why we read an ambiguous rule this way. Shown to reviewers in the card; the model gets only the rule.
+      h('div', { class: 'field interp-field' }, h('label', null, 'Наша трактовка ', h('span', { class: 'hint' }, 'почему правило читаем именно так — видно проверяющему, модели не передаётся')),
+        h('textarea', { class: 'textarea', rows: 3, value: c.interpretation || '', placeholder: 'Например: приветствие бота оператору не засчитывается, потому что…', oninput: (e) => set('interpretation', e.target.value) })),
       h('div', null, h('button', { class: 'link-btn danger', type: 'button', onclick: () => {
         draft.criteria = draft.criteria.filter((x) => x !== c); openRows.delete(c.id); markDirty();
       } }, icon('trash', 15), 'Удалить критерий')));
@@ -170,7 +173,7 @@ export function renderChecklists(root, id) {
     const c = {
       id: `c${Date.now().toString(36)}`, code: next, name: 'Новый критерий',
       section: weighted[weighted.length - 1]?.section || '', type: 'binary', weight: 0,
-      naAllowed: false, description: '', naRule: '',
+      naAllowed: false, description: '', naRule: '', interpretation: '', exportId: '',
     };
     const flagIdx = draft.criteria.findIndex((x) => x.type === 'flag');
     if (flagIdx >= 0) draft.criteria.splice(flagIdx, 0, c); else draft.criteria.push(c);
