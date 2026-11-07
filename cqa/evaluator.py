@@ -19,6 +19,7 @@ decides instead of the model guessing.
 """
 import hashlib
 import json
+import os
 from datetime import datetime
 
 import requests
@@ -277,7 +278,10 @@ def _call_cloud(settings, system, messages, schema):
     if not key:
         raise EvaluationError("Не задан ключ Claude API. Укажите его в разделе «Модель».")
     model = cfg.get("model") or "claude-opus-5-5"
-    client = anthropic.Anthropic(api_key=key, base_url=cfg.get("baseUrl") or "https://api.anthropic.com",
+    # The API address comes only from the server environment, never from browser-editable
+    # settings: otherwise anyone who can PUT /api/settings could redirect the key to their host.
+    base_url = os.environ.get("ANTHROPIC_BASE_URL", "").strip() or "https://api.anthropic.com"
+    client = anthropic.Anthropic(api_key=key, base_url=base_url,
                                  max_retries=3, timeout=600)
     try:
         resp = client.messages.create(
@@ -316,12 +320,40 @@ def _call_cloud(settings, system, messages, schema):
     return text, usage, {"type": "cloud", "model": model}
 
 
+def _local_target(settings):
+    """Where the local engine sends requests, and with which headers.
+
+    When CQA_LOCAL_RELAY_URL and CQA_LOCAL_RELAY_TOKEN are both set (e.g. on Railway,
+    pointing at the authenticated relay behind a tunnel), they win over the browser-
+    editable settings URL, so the token is never sent to an address a visitor typed in.
+    """
+    relay_url, relay_token = _relay_env()
+    if relay_url and relay_token:
+        return relay_url.rstrip("/"), {"Authorization": f"Bearer {relay_token}"}
+    url = (settings.get("local", {}).get("url") or "http://localhost:11434").rstrip("/")
+    return url, {}
+
+
+def _relay_env():
+    return (os.environ.get("CQA_LOCAL_RELAY_URL", "").strip(),
+            os.environ.get("CQA_LOCAL_RELAY_TOKEN", "").strip())
+
+
+def local_relay_enabled():
+    return all(_relay_env())
+
+
+def _local_label(url):
+    """Address shown in messages; the relay (tunnel) address is not echoed into results."""
+    return "релей (CQA_LOCAL_RELAY_URL)" if local_relay_enabled() else url
+
+
 def _call_local(settings, system, messages, schema):
     cfg = settings.get("local", {})
-    url = (cfg.get("url") or "http://localhost:11434").rstrip("/")
+    url, headers = _local_target(settings)
     model = cfg.get("model") or "qwen2.5:14b"
     try:
-        r = requests.post(f"{url}/api/chat", json={
+        r = requests.post(f"{url}/api/chat", headers=headers, json={
             "model": model,
             "messages": [{"role": "system", "content": system}] + messages,
             "format": schema,
@@ -329,7 +361,7 @@ def _call_local(settings, system, messages, schema):
             "options": {"temperature": 0, "num_ctx": 16384},
         }, timeout=900)
     except requests.RequestException:
-        raise EvaluationError(f"Локальная модель недоступна по адресу {url}.")
+        raise EvaluationError(f"Локальная модель недоступна по адресу {_local_label(url)}.")
     if r.status_code != 200:
         raise EvaluationError(f"Локальная модель вернула ошибку {r.status_code}: {r.text[:200]}")
     body = r.json()
@@ -358,16 +390,18 @@ def check_engine(settings):
     """Quick readiness check for the settings screen. No model call is made."""
     engine = settings.get("engine")
     if engine == "local":
-        url = (settings.get("local", {}).get("url") or "http://localhost:11434").rstrip("/")
+        url, headers = _local_target(settings)
         try:
-            r = requests.get(f"{url}/api/tags", timeout=3)
+            r = requests.get(f"{url}/api/tags", headers=headers, timeout=8)
+            if r.status_code == 401:
+                return {"ok": False, "message": "Релей отклонил токен (CQA_LOCAL_RELAY_TOKEN)", "models": []}
             models = [m.get("name") for m in r.json().get("models", [])]
             want = settings.get("local", {}).get("model")
             if want and want not in models and f"{want}:latest" not in models:
                 return {"ok": False, "message": f"Модель {want} не найдена в Ollama", "models": models}
             return {"ok": True, "message": "Ollama подключена", "models": models}
         except Exception:
-            return {"ok": False, "message": f"Ollama не отвечает по адресу {url}", "models": []}
+            return {"ok": False, "message": f"Ollama не отвечает по адресу {_local_label(url)}", "models": []}
     if engine == "replay":
         from . import replay
         n = replay.count_saved()

@@ -9,6 +9,9 @@ sys.path.insert(0, ROOT)
 os.environ.setdefault("CQA_STORAGE_DIR", os.path.join(ROOT, ".pytest_cache", "storage-unused"))
 os.environ.pop("CQA_DATA_API", None)
 os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ.pop("ANTHROPIC_BASE_URL", None)
+os.environ.pop("CQA_LOCAL_RELAY_URL", None)
+os.environ.pop("CQA_LOCAL_RELAY_TOKEN", None)
 
 
 @pytest.fixture

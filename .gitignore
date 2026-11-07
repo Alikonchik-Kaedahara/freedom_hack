@@ -6,3 +6,7 @@ __pycache__/
 .DS_Store
 .claude/
 .env
+
+mds/
+AGENTS.md
+.env.relay

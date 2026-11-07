@@ -24,7 +24,7 @@ import requests
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
 from cqa import export, replay, scoring, storage
-from cqa.evaluator import EvaluationError, check_engine, evaluate
+from cqa.evaluator import EvaluationError, check_engine, evaluate, local_relay_enabled
 from cqa.validation import ValidationError, validate_checklist, validate_group_id, validate_records
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -210,6 +210,9 @@ def public_settings(s):
     cloud["hasKey"] = bool(cloud.get("apiKey") or os.environ.get("ANTHROPIC_API_KEY"))
     cloud["apiKey"] = ""
     s["cloud"] = cloud
+    local = dict(s.get("local", {}))
+    local["relay"] = local_relay_enabled()  # server-side relay in use; its URL and token are never returned
+    s["local"] = local
     s["dataApi"] = bool(DATA_API)
     s["teamName"] = team_name(s)
     return s
@@ -234,6 +237,8 @@ def put_settings():
         return bad("Движок должен быть cloud, local или replay")
     if "cloud" in patch and isinstance(patch["cloud"], dict) and not patch["cloud"].get("apiKey"):
         patch["cloud"].pop("apiKey", None)
+    if isinstance(patch.get("local"), dict):
+        patch["local"].pop("relay", None)  # computed from the environment, not stored
     return jsonify(public_settings(storage.save_settings(patch)))
 
 
