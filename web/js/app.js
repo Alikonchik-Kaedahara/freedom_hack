@@ -16,9 +16,9 @@ import { renderModel } from './views/model.js';
 
 const NAV = [
   { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid' },
-  { path: '/dialogs', label: 'Реестр диалогов', short: 'Диалоги', icon: 'list' },
+  { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list' },
   { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
-  { path: '/checklists', label: 'Конструктор чек-листа', short: 'Чек-листы', icon: 'checks' },
+  { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks' },
   { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu' },
 ];
 
@@ -32,6 +32,7 @@ const ROUTES = [
 ];
 
 const HOST_KEY = 'cqa.hostPreview';
+const THEME_KEY = 'cqa.theme';
 const ui = {};
 let cleanup = null;
 let currentPath = null;
@@ -50,9 +51,10 @@ function buildShell(root) {
   ui.tabs = h('nav', { class: 'rb-tabs', 'aria-label': 'Разделы CQA' });
   ui.pill = h('button', { class: 'ds-pill', type: 'button', 'aria-haspopup': 'dialog' });
   ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
-    icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host Preview'));
+    icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host'));
+  ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая CRM / тёмный терминал' }, icon('contrast', 15), h('span', { class: 'lbl' }, 'Тема'));
   ui.action = h('div', { class: 'rb-action' });
-  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.host, ui.action);
+  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.host, ui.theme, ui.action);
   ui.bridge = h('span', { class: 'bridge' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
@@ -61,7 +63,7 @@ function buildShell(root) {
     h('a', { class: 'rb-brand', href: '#/' },
       h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
       h('span', { class: 'word' }, h('b', null, 'FREEDOM'), h('small', null, 'BROKER')),
-      h('span', { class: 'rb-badge' }, 'CQA Web Resource')),
+      h('span', { class: 'rb-badge' }, 'CQA TERMINAL')),
     ui.tabs, ui.right);
 
   const d365Top = h('div', { class: 'cqa-d365-top' },
@@ -82,8 +84,17 @@ function buildShell(root) {
 
   ui.pill.addEventListener('click', (e) => { e.stopPropagation(); openDatasetPopover(ui.right); });
   ui.host.addEventListener('click', () => setHostPreview(!root.classList.contains('cqa-host-on')));
+  ui.theme.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
+  setTheme(readPref(THEME_KEY) === 'dark' ? 'dark' : 'light', false);
   if (D365Bridge.ready) ui.host.hidden = true; // already inside Dynamics 365
   else setHostPreview(readPref(HOST_KEY) === '1', false);
+}
+
+function setTheme(theme, persist = true) {
+  ui.root.dataset.theme = theme;
+  ui.theme.setAttribute('aria-pressed', String(theme === 'dark'));
+  if (persist) writePref(THEME_KEY, theme);
+  // SVG pieces read their colors from CSS tokens, so only views with cached layout need a redraw.
 }
 
 function setHostPreview(on, persist = true) {
@@ -93,7 +104,8 @@ function setHostPreview(on, persist = true) {
   if (persist) writePref(HOST_KEY, on ? '1' : '0');
   const ready = D365Bridge.ready;
   ui.bridge.className = `bridge ${ready ? 'ok' : 'wait'}`;
-  ui.bridge.replaceChildren(h('i'), ready ? 'Xrm.WebApi Bridge: Ready' : 'Предпросмотр · Xrm не обнаружен');
+  // Shows "Connected" only with a real Xrm object; the standalone preview says so honestly.
+  ui.bridge.replaceChildren(h('i'), ready ? 'Xrm.Page Bridge: Connected' : 'Xrm.Page Bridge · демо, Xrm не найден');
 }
 
 function renderChrome() {
@@ -110,7 +122,7 @@ function renderChrome() {
       h('span', { class: 'tab-label' }, item.short));
   }));
   const ds = state.datasets.find((d) => d.groupId === state.group);
-  ui.pill.replaceChildren(icon('database', 14), 'Набор:', h('span', { class: 'mono' }, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
+  ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'GROUP:'), h('span', null, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
   ui.root.classList.toggle('no-data', !state.group);
 }
 
@@ -184,4 +196,4 @@ function writePref(k, v) { try { localStorage.setItem(k, v); } catch { /* storag
 
 // Public namespace for Dynamics 365 engineers and the host page.
 window.FreedomCQA = { mount, version: '1.0' };
-window.CQA = { Config: { get apiBase() { return window.CQA_API_BASE || ''; } }, Store: state, Scoring, Api: api, D365Bridge };
+window.CQA = { Config: { get apiBase() { return window.CQA_API_BASE || ''; } }, State: state, Store: state, Scoring, Api: api, D365Bridge };

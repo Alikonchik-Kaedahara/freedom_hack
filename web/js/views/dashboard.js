@@ -88,8 +88,8 @@ function cell(label, value, foot, opts = {}) {
 function progressSvg(p) {
   const w = Math.max(0, Math.min(1, p)) * 100;
   return svg('svg', { class: 'spark', viewBox: '0 0 100 6', preserveAspectRatio: 'none', role: 'img', 'aria-label': `${Math.round(w)}%` },
-    svg('rect', { x: 0, y: 0, width: 100, height: 6, rx: 3, fill: '#EEF2F0' }),
-    svg('rect', { x: 0, y: 0, width: w, height: 6, rx: 3, fill: '#00A859' }));
+    svg('rect', { class: 'trk', x: 0, y: 0, width: 100, height: 6, rx: 3 }),
+    svg('rect', { class: 'ok', x: 0, y: 0, width: w, height: 6, rx: 3 }));
 }
 
 function modelName() {
@@ -139,13 +139,13 @@ function criteriaCard(evaluated) {
     rows.map((a, i) => {
       const y = i * rowH + 4;
       const pct = a.n ? a.sum / a.n : null;
-      const color = pct == null ? '#C9D3CD' : pct >= 0.85 ? '#00A859' : pct >= 0.65 ? '#E0A91B' : '#C4314B';
+      const tone = pct == null ? 'none' : pct >= 0.85 ? 'ok' : pct >= 0.65 ? 'part' : 'fail';
       const name = a.name.length > maxName ? `${a.name.slice(0, maxName - 1)}…` : a.name;
       return svg('g', null,
         svg('text', { class: 'code', x: 0, y: y + 15 }, a.code),
         svg('text', { x: 28, y: y + 15 }, svg('title', null, a.name), name),
-        svg('rect', { x: labelW, y: y + 5, width: barW, height: 12, rx: 2, fill: '#EEF2F0' }),
-        pct != null ? svg('rect', { x: labelW, y: y + 5, width: Math.max(2, barW * pct), height: 12, rx: 2, fill: color }) : null,
+        svg('rect', { class: 'trk', x: labelW, y: y + 5, width: barW, height: 12, rx: 2 }),
+        pct != null ? svg('rect', { class: tone, x: labelW, y: y + 5, width: Math.max(2, barW * pct), height: 12, rx: 2 }) : null,
         svg('text', { class: 'pct', x: labelW + barW + 10, y: y + 15 }, pct == null ? '—' : `${Math.round(pct * 100)}%`),
         a.na && !narrow ? svg('text', { class: 'na', x: W - 2, y: y + 15, 'text-anchor': 'end' }, `N/A ${a.na}`) : null);
     }));
@@ -153,9 +153,9 @@ function criteriaCard(evaluated) {
     h('h3', { class: 'card-title' }, 'Выполнение критериев 01–07', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, `по ${evaluated.length} ${pluralRu(evaluated.length, 'диалогу', 'диалогам', 'диалогам')}`)),
     chart,
     h('div', { class: 'legend-inline' },
-      h('span', null, h('i', { style: { background: '#00A859' } }), '≥ 85%'),
-      h('span', null, h('i', { style: { background: '#E0A91B' } }), '65–84%'),
-      h('span', null, h('i', { style: { background: '#C4314B' } }), '< 65%'),
+      h('span', null, h('i', { class: 'ok' }), '≥ 85%'),
+      h('span', null, h('i', { class: 'part' }), '65–84%'),
+      h('span', null, h('i', { class: 'fail' }), '< 65%'),
       h('span', null, 'N/A — сколько раз критерий был неприменим')),
     segments(evaluated));
 }
