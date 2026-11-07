@@ -1087,6 +1087,13 @@ a.q-line:hover b { text-decoration: underline; }
 .info-dot:hover, .info-dot:focus-visible { color: var(--cqa-text-primary); border-color: var(--cqa-text-muted); }
 .verdict { font-family: var(--cqa-font-sans); white-space: nowrap; }
 
+/* ============ v5 · 7. Operators ============ */
+.op-table tr.unnamed td { color: var(--cqa-text-muted); }
+.op-table tr.unnamed .op-name b { font-weight: 600; }
+.op-table tr.unnamed .score { color: var(--cqa-text-muted); }
+.op-dialogs .row-act { text-align: right; }
+.op-dialogs .chan { display: inline-flex; align-items: center; gap: 4px; color: var(--cqa-text-secondary); }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
@@ -1316,9 +1323,9 @@ a.q-line:hover b { text-decoration: underline; }
   .table.registry td:nth-child(7) { grid-area: score; text-align: right; }
   .table.registry td:nth-child(8) { grid-area: st; }
   .table.registry td:nth-child(9) { grid-area: act; }
-  .table.op-table tbody tr { grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "name count avg" "weak weak go"; }
+  .table.op-table tbody tr { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "name avg" "weak go"; }
   .table.op-table td:nth-child(1) { display: block; grid-area: name; }
-  .table.op-table td:nth-child(2) { grid-area: count; }
+  .table.op-table td:nth-child(2) { display: none; }
   .table.op-table td:nth-child(3) { grid-area: avg; text-align: right; }
   .table.op-table td:nth-child(4), .table.op-table td:nth-child(5), .table.op-table td:nth-child(6) { display: none; }
   .table.op-table td:nth-child(7) { grid-area: weak; }
