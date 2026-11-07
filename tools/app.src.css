@@ -976,6 +976,38 @@ p { margin: 0; }
 .rb-tabs a.active::after { box-shadow: none; }
 .gross-banner .gb-icon::after { animation: none; box-shadow: none; }
 
+/* ============ v5 · 2. Header and navigation ============ */
+.ribbon { height: 52px; background: #0B3324; gap: 18px; padding: 0 16px; }
+:scope[data-theme="dark"] .ribbon { background: var(--cqa-header); }
+.rb-brand { gap: 10px; }
+.rb-brand .word, .rb-badge { display: none; }
+.rb-name { color: #fff; font-size: 14.5px; font-weight: 700; white-space: nowrap; }
+.rb-title { display: flex; align-items: center; padding-left: 10px; border-left: 1px solid rgba(255, 255, 255, .25); color: rgba(255, 255, 255, .82); font-size: 14px; font-weight: 500; }
+.cqa-host-on .rb-tabs { visibility: visible; }
+.rb-tabs { gap: 0; }
+.rb-tabs a { padding: 0 12px; font-size: 13.5px; color: rgba(255, 255, 255, .72); }
+.rb-tabs a:hover { color: #fff; background: rgba(255, 255, 255, .06); }
+.rb-tabs a.active { color: #fff; }
+.rb-tabs a.active::after { background: var(--cqa-brand-primary); left: 10px; right: 10px; height: 3px; }
+:scope[data-theme="dark"] .rb-tabs a.active::after { background: var(--cqa-brand-action); }
+.rb-tabs .badge { margin-left: 6px; }
+.rb-action, .bridge-badge { display: none !important; }
+.page-head .eval-main { display: inline-flex; }
+.ds-pill { border-color: rgba(255, 255, 255, .22); color: #fff; }
+.ds-pill .k { color: rgba(255, 255, 255, .7); }
+.user-card { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px 0 4px; border: 1px solid transparent; border-radius: 18px; background: transparent; color: #fff; text-align: left; }
+.user-card:hover { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .16); }
+.uc-avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; flex: none; }
+.uc-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.uc-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
+.uc-text small { font-size: 11px; color: rgba(255, 255, 255, .65); white-space: nowrap; }
+.user-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; width: 220px; background: var(--cqa-bg-surface); color: var(--cqa-text-primary); border: 1px solid var(--cqa-border-strong); border-radius: 6px; padding: 6px; }
+.user-menu .um-head { padding: 6px 8px 8px; border-bottom: 1px solid var(--cqa-border-hairline); margin-bottom: 4px; display: flex; flex-direction: column; }
+.user-menu .um-head small { color: var(--cqa-text-muted); font-size: 12px; }
+.user-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 4px; font-size: 13.5px; }
+.user-menu button:hover { background: var(--cqa-bg-elevated); }
+.cqa-d365-rail a { font-size: 11px; }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
@@ -988,6 +1020,9 @@ p { margin: 0; }
   .two-one, .builder, .engines { grid-template-columns: 1fr; }
   .v3-split { grid-template-columns: 1fr; }
   .rb-title { display: none; }
+  .uc-text { display: none; }
+  .user-card { padding: 0 4px; }
+  .rb-tabs a { padding: 0 9px; }
   .tstrip.tstrip-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .tstrip.tstrip-4 .tcell:nth-child(3) { border-left: 0; }
   .tstrip.tstrip-4 .tcell:nth-child(4) { border-left: 1px solid var(--cqa-border-hairline); }
@@ -1007,6 +1042,9 @@ p { margin: 0; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
   .rb-title, .bridge-badge { display: none !important; }
+  .rb-name { font-size: 13.5px; }
+  .theme-toggle { display: none !important; }
+  .user-card { padding: 0 2px; }
   .theme-toggle { width: 34px; padding: 0; justify-content: center; }
   .page-head { padding: 12px 14px; min-height: 0; }
   .v3-split { grid-template-columns: 1fr; }
