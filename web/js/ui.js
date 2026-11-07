@@ -83,7 +83,8 @@ export function icon(name, size = 18, stroke = 2) {
 // ---------- formatting ----------
 
 export const fmtScore = (v) => (v == null ? '—' : Number(v).toFixed(2));
-export const scoreClass = (v) => (v == null ? 'none' : v >= 85 ? 'good' : v >= 65 ? 'mid' : 'bad');
+export const LOW_SCORE_THRESHOLD = 65;
+export const scoreClass = (v) => (v == null ? 'none' : v >= 85 ? 'good' : v >= LOW_SCORE_THRESHOLD ? 'mid' : 'bad');
 export const channelLabel = (c) => (c === 'voice call' ? 'Звонок' : 'Чат');
 export const channelIcon = (c) => (c === 'voice call' ? 'phone' : 'chat');
 export const pluralRu = (n, one, few, many) => {

@@ -1,5 +1,5 @@
 // Апелляции: the queue and the decision. The header profile supplies the names of the author and reviewer.
-import { h, icon, fmtScore, openModal, toast, fmtDate, pluralRu } from '../ui.js';
+import { h, icon, fmtScore, openModal, toast, fmtDate, hashQuery } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, allAppeals, putResult } from '../store.js';
 import { finalAnswers, score, verdictOf, answerOptions, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
@@ -12,16 +12,22 @@ let drawActive = null;
 const UNNAMED = new Set(['', 'Не представился', '[Имя скрыто]']);
 
 export function renderAppeals(root) {
+  const preset = hashQuery().get('tab');
+  if (['pending', 'done'].includes(preset)) tab = preset;
   const stats = appealsPanel();
   const draw = () => root.replaceChildren(build(stats.el));
   drawActive = draw;
   draw();
-  stats.refresh();
-  const off = subscribe((w) => { if (w === 'results') { draw(); stats.refresh(); } });
+  if (root.contains(stats.el)) stats.refresh();
+  const off = subscribe((w) => { if (w === 'results') { draw(); if (root.contains(stats.el)) stats.refresh(); } });
   return () => { drawActive = null; off(); };
 }
 
-function rerender() { drawActive?.(); }
+function selectTab(value) {
+  tab = value;
+  history.replaceState(null, '', '#/appeals?tab=' + value);
+  drawActive?.();
+}
 
 /** «Томирис А., 8 нояб., 01:12» — or just the date when the name was not recorded. */
 export function byLine(name, iso) {
@@ -41,12 +47,9 @@ function build(stats) {
   const list = tab === 'pending' ? pending : done;
 
   const seg = h('div', { class: 'segmented' },
-    h('button', { type: 'button', class: tab === 'pending' ? 'on' : '', onclick: () => { tab = 'pending'; rerender(); } }, 'Ждут решения', h('span', { class: 'count' }, pending.length)),
-    h('button', { type: 'button', class: tab === 'done' ? 'on' : '', onclick: () => { tab = 'done'; rerender(); } }, 'Решённые', h('span', { class: 'count' }, done.length)));
+    h('button', { type: 'button', class: tab === 'pending' ? 'on' : '', onclick: () => selectTab('pending') }, 'Ждут решения', h('span', { class: 'count' }, pending.length)),
+    h('button', { type: 'button', class: tab === 'done' ? 'on' : '', onclick: () => selectTab('done') }, 'Решённые', h('span', { class: 'count' }, done.length)));
 
-  const sub = items.length
-    ? `${pending.length} ${pluralRu(pending.length, 'ждёт', 'ждут', 'ждут')} решения · ${done.length} ${pluralRu(done.length, 'решена', 'решены', 'решено')}`
-    : 'Проверяющий решает, оставить оценку или изменить её';
 
   let content;
   if (!items.length) {
@@ -55,8 +58,7 @@ function build(stats) {
       h('p', null, 'Их подают из карточки диалога, кнопкой «Подать апелляцию» у критерия.'));
   } else if (!list.length) {
     content = h('div', { class: 'empty' },
-      h('h3', null, tab === 'pending' ? 'Все апелляции решены' : 'Решённых апелляций пока нет'),
-      tab === 'pending' ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { tab = 'done'; rerender(); } }, 'Показать решённые') : null);
+      h('h3', null, tab === 'pending' ? 'Все апелляции решены' : 'Решённых апелляций пока нет'));
   } else {
     content = h('table', { class: 'table appeals-table' },
       h('thead', null, h('tr', null,
@@ -66,8 +68,8 @@ function build(stats) {
   }
 
   return h('div', { class: 'page' },
-    h('div', { class: 'page-head' }, h('div', null, h('h1', null, 'Апелляции'), h('div', { class: 'sub' }, sub)), items.length ? seg : null),
-    h('div', { class: 'card', style: { overflow: 'hidden' } }, content), stats);
+    h('div', { class: 'page-head' }, h('div', null, h('h1', null, 'Апелляции')), items.length ? seg : null),
+    h('div', { class: 'card', style: { overflow: 'hidden' } }, content), done.length ? stats : null);
 }
 
 function row({ result, appeal }) {
@@ -159,8 +161,7 @@ export function openReview(result, appeal) {
         h('h4', null, 'Оценка системы'),
         h('div', { class: 'rm-ai' }, h('b', null, verdictText(c, ai.answer)), h('span', null, ai.explanation || '')),
         ai.confidence || dispute ? h('div', { class: 'who-line' },
-          ai.confidence ? `Уверенность оценки: ${CONFIDENCE_LABEL[ai.confidence] || ai.confidence}` : '',
-          dispute ? `${ai.confidence ? ' · ' : ''}${dispute.text}` : '') : null,
+          dispute?.text || `Уверенность оценки: ${CONFIDENCE_LABEL[ai.confidence] || ai.confidence}`) : null,
         idx.size ? fragment : null),
       h('div', { class: 'rm-box' },
         h('h4', null, 'Решение'),

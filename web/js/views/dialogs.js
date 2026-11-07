@@ -1,10 +1,10 @@
 // Диалоги: the registry. Search and one-click filters, sorting by score or operator,
 // a selection bar for batch actions, statuses in words.
-import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, hashQuery, clearHashQuery, moreMenu } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, hashQuery, moreMenu } from '../ui.js';
 import { state, subscribe, summaryFor, resultFor } from '../store.js';
 import { currentReview, reviewCriteria, reviewLink, rememberReviewList } from '../review.js';
 import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
-import { finalAnswers, score } from '../scoring.js';
+import { codeOf, criterionChoices, criterionControls, criterionEntries, hasCriteria, matchingCriteria, readCriteria, severityOf, worstRank, writeCriteria } from '../criterion-filter.js';
 import { openExportModal } from './export.js';
 
 const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, review: false, reviewed: false, q: '' };
@@ -22,31 +22,54 @@ export function renderDialogs(root) {
   // Links from Home open the registry already filtered: #/dialogs?f=gross | disputed | appeal
   const query = hashQuery();
   const preset = query.get('f');
-  let violation = query.get('violation');
-  const operator = query.get('operator');
-  if (violation) resetFilters();
-  const violationCriterion = (res) => res?.checklist.criteria.find((c) => String(c.code || c.id) === violation);
-  const clearViolation = () => { violation = null; clearHashQuery(); };
+  const criterionFilter = readCriteria(query);
+  let operator = query.get('operator');
+  if (query.has('violation')) resetFilters();
   if (['gross', 'disputed', 'appeal', 'review', 'reviewed'].includes(preset)) {
     resetFilters();
     filters[preset] = true;
     if (preset === 'gross' || preset === 'disputed') filters.review = true;
-    clearHashQuery();
+    query.delete('f');
   }
+
+  const syncUrl = () => {
+    writeCriteria(query, criterionFilter);
+    if (operator) query.set('operator', operator); else query.delete('operator');
+    history.replaceState(null, '', '#/dialogs' + (query.size ? '?' + query : ''));
+  };
+  syncUrl();
 
   const page = h('div', { class: 'page' });
   root.append(page);
   const headHost = h('div'), chipsHost = h('div'), selHost = h('div'), tbodyHost = h('div'), footHost = h('div');
 
+  const entriesById = new Map();
+  const matchesById = new Map();
+  let visibleIds = [];
+  const controls = criterionControls(criterionFilter, () => {
+    if (criterionFilter.severity) sort.key = null;
+    syncUrl();
+    drawRows();
+  }, true);
+  const loadCriteria = () => {
+    const checklists = [...state.checklists];
+    entriesById.clear();
+    for (const r of state.records) {
+      const id = r.conversation_id;
+      const res = resultFor(id);
+      if (res) checklists.push(res.checklist);
+      entriesById.set(id, criterionEntries(res, summaryFor(id)?.final));
+    }
+    controls.setChoices(criterionChoices(checklists));
+  };
   const visible = () => {
+    matchesById.clear();
     const rows = state.records.filter((r) => {
       const s = summaryFor(r.conversation_id);
-      if (violation) {
-        const res = resultFor(r.conversation_id);
-        const c = violationCriterion(res);
-        if (!c || (operator != null && res.operator !== operator)) return false;
-        if (!['fail', 'part', 'flag'].includes(s?.final.per[c.id]?.status)) return false;
-      }
+      const matches = matchingCriteria(entriesById.get(r.conversation_id) || [], criterionFilter);
+      matchesById.set(r.conversation_id, matches);
+      if (hasCriteria(criterionFilter) && !matches.length) return false;
+      if (operator && (resultFor(r.conversation_id)?.operator || '').trim() !== operator) return false;
       if (filters.lang.size && !filters.lang.has(r.language)) return false;
       if (filters.channel.size && !filters.channel.has(r.channel)) return false;
       if (filters.gross && !(filters.review ? reviewCriteria(r.conversation_id, 'gross').length : s?.gross)) return false;
@@ -60,7 +83,9 @@ export function renderDialogs(root) {
       if (filters.q && !matchOf(r)) return false;
       return true;
     });
-    if (sort.key === 'score') {
+    if (criterionFilter.severity) {
+      rows.sort((a, b) => worstRank(matchesById.get(a.conversation_id)) - worstRank(matchesById.get(b.conversation_id)));
+    } else if (sort.key === 'score') {
       // Not yet evaluated rows always go last.
       rows.sort((a, b) => {
         const x = summaryFor(a.conversation_id)?.total, y = summaryFor(b.conversation_id)?.total;
@@ -120,9 +145,8 @@ export function renderDialogs(root) {
     chipsHost.replaceChildren(h('div', { class: 'toolbar reg-toolbar' },
       h('div', { class: 'search' }, icon('search', 16), search),
       h('div', { class: 'chips' },
-        violation && h('button', { class: 'chip on', type: 'button',
-          title: 'Снять фильтр по нарушению', onclick: () => { clearViolation(); drawChips(); drawRows(); } },
-          `Критерий ${violation}${operator != null ? ' · ' + operator : ''} ×`),
+        operator && h('button', { class: 'chip on', type: 'button', title: 'Снять фильтр по оператору',
+          onclick: () => { operator = null; syncUrl(); drawChips(); drawRows(); } }, operator, ' ×'),
         ['RU', 'KZ', 'EN'].map((l) => chip(l, filters.lang.has(l), toggleSet(filters.lang, l))),
         h('span', { class: 'chip-sep' }),
         chip('Чат', filters.channel.has('agent chat'), toggleSet(filters.channel, 'agent chat')),
@@ -153,8 +177,9 @@ export function renderDialogs(root) {
   };
 
   const sortTh = (key, label, cls) => {
-    const on = sort.key === key;
+    const on = !criterionFilter.severity && sort.key === key;
     const next = () => {
+      if (criterionFilter.severity) { criterionFilter.severity = false; controls.sync(); syncUrl(); }
       if (!on) { sort.key = key; sort.dir = 1; } else if (sort.dir === 1) sort.dir = -1; else sort.key = null;
       drawRows();
     };
@@ -172,10 +197,11 @@ export function renderDialogs(root) {
       return;
     }
     const rows = visible();
+    visibleIds = rows.map((r) => r.conversation_id);
     if (!rows.length) {
       tbodyHost.replaceChildren(h('div', { class: 'empty' },
         h('h3', null, 'По этим условиям диалогов нет'),
-        anyFilter() || violation ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { resetFilters(); clearViolation(); drawChips(); drawRows(); } }, 'Сбросить фильтры') : null));
+        anyFilter() || operator || hasCriteria(criterionFilter) ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { resetFilters(); operator = null; drawChips(); controls.reset(); } }, 'Сбросить фильтры') : null));
       footHost.replaceChildren();
       return;
     }
@@ -188,7 +214,7 @@ export function renderDialogs(root) {
       h('thead', null, h('tr', null,
         h('th', { style: { width: '44px' } }, headCb),
         h('th', null, 'ID'), sortTh('operator', 'Оператор'), h('th', null, 'Канал'), h('th', null, 'Язык'),
-        h('th', null, 'Критерии 01–08'),
+        h('th', null, 'Критерии'),
         sortTh('score', 'Балл', 'right'), h('th', null, 'Статус'), h('th', null, ''))),
       h('tbody', null, rows.map(row))));
     footHost.replaceChildren(h('div', { class: 'table-foot' },
@@ -229,9 +255,14 @@ export function renderDialogs(root) {
       },
     });
     const open = () => {
-      rememberReviewList(visible().map((r) => r.conversation_id));
-      const c = violation && violationCriterion(res);
-      location.hash = c ? `#/dialog/${encodeURIComponent(cid)}?criterion=${encodeURIComponent(c.id)}` : reviewLink(cid, queue);
+      rememberReviewList(visibleIds);
+      const matches = matchesById.get(cid);
+      if ((hasCriteria(criterionFilter) || criterionFilter.severity) && matches?.length) {
+        const worst = worstRank(matches);
+        const first = matches.find((entry) => severityOf(entry) === worst);
+        const params = writeCriteria(new URLSearchParams({ criterion: first.c.id, queue }), criterionFilter);
+        location.hash = `#/dialog/${encodeURIComponent(cid)}?${params}`;
+      } else location.hash = reviewLink(cid, queue);
     };
     const m = matchOf(r);
     const act = s
@@ -243,7 +274,7 @@ export function renderDialogs(root) {
       h('td', null, operatorCell(cid)),
       h('td', null, h('span', { class: 'chan' }, icon(channelIcon(r.channel), 14), channelLabel(r.channel))),
       h('td', null, h('span', { class: 'lang' }, r.language)),
-      h('td', null, matrix(cid)),
+      h('td', null, matrix(hasCriteria(criterionFilter) ? matchesById.get(cid) : entriesById.get(cid), hasCriteria(criterionFilter))),
       h('td', { class: 'right' }, h('span', { class: `score ${scoreClass(s?.total)}` }, fmtScore(s?.total))),
       h('td', null, h('div', { class: 'tags' }, tags)),
       h('td', { class: 'row-act' }, act));
@@ -256,11 +287,13 @@ export function renderDialogs(root) {
 
   const drawAll = () => { drawHead(); drawChips(); drawSelection(); drawRows(); };
 
-  page.append(headHost, h('div', { class: 'card', style: { overflow: 'hidden' } }, chipsHost, selHost, tbodyHost, footHost));
+  page.append(headHost, h('div', { class: 'card', style: { overflow: 'hidden' } }, chipsHost, controls.el, selHost, tbodyHost, footHost));
+  loadCriteria();
   drawAll();
 
   return subscribe((w) => {
-    if (w === 'results' || w === 'job') { drawHead(); drawSelection(); drawRows(); }
+    if (w === 'results' || w === 'checklists') loadCriteria();
+    if (w === 'results' || w === 'checklists' || w === 'job') { drawHead(); drawSelection(); drawRows(); }
   });
 }
 
@@ -269,20 +302,17 @@ const operatorOf = (cid) => {
   return UNNAMED.has(name) ? '' : name;
 };
 
-// Eight squares, one per checklist criterion; the last one is the gross-error check.
-const MX_SYMBOL = { ok: '✓', clean: '✓', part: '½', fail: '×', flag: '!', na: '–' };
-const MX_TITLE = { ok: 'выполнен', part: 'частично', fail: 'не выполнен', na: 'не применим', flag: 'грубая ошибка', clean: 'грубых ошибок нет' };
-function matrix(cid) {
-  const res = resultFor(cid);
-  if (!res) return h('span', { class: 'mx' }, Array.from({ length: 8 }, () => h('i', { class: 'empty' })));
-  const sc = score(res.checklist, finalAnswers(res));
-  const cells = res.checklist.criteria.map((c) => {
-    const st = sc.per[c.id]?.status || 'na';
-    const cls = st === 'flag' ? 'fail' : st === 'clean' ? 'ok' : st;
-    const label = `${c.code} ${c.name}: ${MX_TITLE[st] || st}`;
-    return h('i', { class: cls, role: 'img', 'aria-label': label, title: label }, MX_SYMBOL[st]);
+const MX_SYMBOL = { ok: '✓', clean: '✓', part: '½', fail: '×', flag: '!', na: '–', missing: '?' };
+const MX_TITLE = { ok: 'выполнен', part: 'частично выполнен', fail: 'не выполнен', na: 'не применим', flag: 'грубая ошибка', clean: 'грубых ошибок нет', missing: 'нет оценки' };
+function matrix(entries, filtered) {
+  if (!entries?.length) return h('span', { class: 'muted' }, '—');
+  const cells = entries.map(({ c, status }) => {
+    const cls = status === 'flag' ? 'fail' : status === 'clean' ? 'ok' : status === 'missing' ? 'na' : status;
+    const label = `${codeOf(c)} ${c.name}: ${MX_TITLE[status]}`;
+    return h('i', { class: cls, role: 'img', 'aria-label': label, title: label },
+      filtered && codeOf(c) + ' ', MX_SYMBOL[status]);
   });
-  return h('span', { class: 'mx' }, cells);
+  return h('span', { class: filtered ? 'mx mx-filtered' : 'mx' }, cells);
 }
 
 /** Operator of an evaluated dialog (from the first reply, or set by hand); unknown until evaluated. */

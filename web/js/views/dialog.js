@@ -6,6 +6,7 @@ import { state, subscribe, resultFor, summaryFor, putResult, keyOf, refreshResul
 import { currentReview, reviewCriteria, nextReviewLink, reviewVersion } from '../review.js';
 import { finalAnswers, score, verdictOf, round2, disputeLabel, evidenceOf, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
+import { criterionChoices, criterionControls, criterionEntries, matchingCriteria, readCriteria, writeCriteria } from '../criterion-filter.js';
 import { createPlayer } from '../player.js';
 import { openReview, byLine } from './appeals.js';
 import { requireUser } from '../user.js';
@@ -38,6 +39,15 @@ export function renderDialog(root, cid) {
   const query = hashQuery();
   const queue = query.get('queue') || 'all';
   const requested = query.get('criterion');
+  const criterionFilter = readCriteria(query);
+  const groups = h('div', { class: 'criterion-groups' });
+  const controls = criterionControls(criterionFilter, () => {
+    query.delete('criterion');
+    writeCriteria(query, criterionFilter);
+    history.replaceState(null, '', `#/dialog/${encodeURIComponent(cid)}` + (query.size ? '?' + query : ''));
+    highlight([], '');
+    drawCriteria();
+  });
   let returnCriterion = null;
   let scoreScroll = 0;
 
@@ -250,10 +260,16 @@ export function renderDialog(root, cid) {
     const fa = finalAnswers(res);
     const crit = res.checklist.criteria.find((c) => c.type === 'flag' && fa[c.id]?.answer === 'yes');
     const ev = fa[crit.id]?.evidence || [];
+    function showEvidence() {
+      if (!groups.querySelector(`[data-criterion="${CSS.escape(crit.id)}"]`)) controls.reset();
+      open.add(crit.id);
+      drawInspector();
+      jump(ev, 'flag', null, true, crit.id);
+    }
     for (const i of ev) msgEls[i]?.classList.add('gross');
     bannerHost.replaceChildren(h('div', { class: 'gross-banner', role: 'alert' },
       h('div', { class: 'gb-text' }, h('b', null, 'Грубая ошибка'), ' — ', fa[crit.id]?.explanation || crit.name),
-      ev.length ? h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true, crit.id); } }, 'Показать в диалоге') : null));
+      ev.length ? h('button', { class: 'btn btn-sm', type: 'button', onclick: showEvidence }, 'Показать в диалоге') : null));
   }
 
   function drawInspector() {
@@ -291,15 +307,27 @@ export function renderDialog(root, cid) {
           h('div', { class: 'bar' }, h('i', { style: { width: `${s.pct ?? 0}%` } })),
           h('span', { class: 'p' }, s.pct == null ? '—' : `${Math.round(s.pct)}%`)))) : null);
 
-    const groups = [];
-    let lastSec = null;
-    for (const c of res.checklist.criteria) {
-      if (c.section && c.section !== lastSec) { groups.push(h('div', { class: 'sec-title' }, c.section)); lastSec = c.section; }
-      groups.push(critCard(res, c, fa[c.id], res.answers[c.id], sc));
-    }
+    controls.setChoices(criterionChoices([res.checklist]));
+    drawCriteria(res, fa, sc);
     const scroll = inspector.scrollTop;
-    inspector.replaceChildren(h('div', { class: 'inspector' }, total, groups));
+    inspector.replaceChildren(h('div', { class: 'inspector' }, total, controls.el, groups));
     inspector.scrollTop = scroll;
+  }
+
+  function drawCriteria(res = resultFor(cid), fa = finalAnswers(res), sc = summaryFor(cid).final) {
+    const matches = matchingCriteria(criterionEntries(res, sc), criterionFilter);
+    const cards = [];
+    let lastSection;
+    for (const { c } of matches) {
+      if (!criterionFilter.severity && c.section && c.section !== lastSection) {
+        cards.push(h('div', { class: 'sec-title' }, c.section));
+        lastSection = c.section;
+      }
+      cards.push(critCard(res, c, fa[c.id], res.answers[c.id], sc));
+    }
+    groups.replaceChildren(...cards);
+    if (!cards.length) groups.append(h('p', { class: 'muted' }, 'Нет критериев с таким результатом.'),
+      h('button', { type: 'button', class: 'link-btn', onclick: controls.reset }, 'Показать все критерии'));
   }
 
   function critCard(res, c, ans, origAns, sc) {
@@ -328,8 +356,8 @@ export function renderDialog(root, cid) {
     const outstanding = reviewCriteria(cid).includes(c.id);
     const body = isOpen ? h('div', { class: 'crit-body' },
       ans?.explanation ? h('div', { class: 'expl' }, ans.explanation) : null,
-      dispute ? h('div', { class: `dispute ${dispute.cls}` },
-        icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
+      ans?.needsReview && dispute?.why ? h('div', { class: `dispute ${dispute.cls}` },
+        icon('alert', 15), h('div', null, dispute.why)) : null,
       ans?.confidence && !dispute ? h('div', { class: 'conf-line' }, `Уверенность оценки: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
       secondOpinionNote(res, c),
       knowledgeNote(ans),
@@ -465,7 +493,8 @@ export function renderDialog(root, cid) {
 
   function drawAll() { drawHead(); drawBanner(); drawInspector(); }
   const initial = resultFor(cid);
-  const entryId = initial?.checklist.criteria.some((c) => c.id === requested) ? requested : reviewCriteria(cid)[0];
+  const shown = matchingCriteria(criterionEntries(initial, summaryFor(cid)?.final), criterionFilter).map(({ c }) => c.id);
+  const entryId = shown.includes(requested) ? requested : reviewCriteria(cid).find((id) => shown.includes(id));
   if (entryId) open.add(entryId);
   drawAll();
   if (entryId) {

@@ -1,6 +1,6 @@
 // Операторы: evaluated dialogs grouped by the operator who handled them — average, failure
 // rates per criterion, gross errors, the dialogs behind each number, and a per-dialog name override.
-import { h, icon, fmtScore, scoreClass, channelIcon, pluralRu } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelIcon, pluralRu, hashQuery, LOW_SCORE_THRESHOLD } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe } from '../store.js';
 import { violationPanel } from './insights.js';
@@ -18,6 +18,9 @@ const svg = (tag, attrs, ...kids) => {
 const pct = (v) => (v == null ? '—' : `${Math.round(v)}%`);
 
 export function renderOperators(root, name) {
+  const filter = hashQuery().get('low');
+  const band = !name && ['single', 'repeat'].includes(filter) ? filter : null;
+  if (!name && list_state.band !== band) { list_state.q = ''; list_state.band = band; }
   const page = h('div', { class: 'page' });
   root.append(page);
   let profiles = null;
@@ -89,7 +92,12 @@ export function renderOperators(root, name) {
     function drawTable() {
       const q = list_state.q.trim().toLowerCase();
       const val = (p) => (list_state.key === 'name' ? p.name : p[list_state.key] ?? -1);
-      const rows = profiles.filter((p) => !q || p.name.toLowerCase().includes(q)).sort((a, b) => {
+      const rows = profiles.filter((p) => {
+        if (q && !p.name.toLowerCase().includes(q)) return false;
+        if (!band) return true;
+        const low = p.dialogs.filter((d) => d.total != null && d.total < LOW_SCORE_THRESHOLD).length;
+        return !UNNAMED.has(p.name) && (band === 'repeat' ? low >= 2 : low === 1);
+      }).sort((a, b) => {
         // Unnamed groups always go last, whatever the sort.
         const ua = UNNAMED.has(a.name), ub = UNNAMED.has(b.name);
         if (ua !== ub) return ua - ub;
@@ -98,7 +106,7 @@ export function renderOperators(root, name) {
       });
       if (!rows.length) {
         host.replaceChildren(h('div', { class: 'empty' }, h('h3', null, 'Таких операторов нет'),
-          h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { list_state.q = ''; search.value = ''; drawTable(); } }, 'Сбросить поиск')));
+          q ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { list_state.q = ''; search.value = ''; drawTable(); } }, 'Сбросить поиск') : null));
         return;
       }
       host.replaceChildren(h('table', { class: 'table op-table' },
@@ -124,7 +132,9 @@ export function renderOperators(root, name) {
     };
     drawTable();
     return h('div', { class: 'card', style: { overflow: 'hidden' } },
-      h('div', { class: 'toolbar reg-toolbar' }, h('div', { class: 'search' }, icon('search', 16), search)),
+      h('div', { class: 'toolbar reg-toolbar' }, h('div', { class: 'search' }, icon('search', 16), search),
+        band && h('a', { class: 'chip on', href: '#/operators', title: 'Показать всех операторов' },
+          `Ниже ${LOW_SCORE_THRESHOLD} · ${band === 'single' ? 'один диалог' : 'два и более'} ×`)),
       host);
   }
 

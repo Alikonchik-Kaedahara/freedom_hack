@@ -1,5 +1,5 @@
 // Главная: the work desk — what to do today (three queues), then how things are overall.
-import { h, fmtScore, scoreClass, pluralRu } from '../ui.js';
+import { h, fmtScore, scoreClass, pluralRu, LOW_SCORE_THRESHOLD } from '../ui.js';
 import { state, subscribe, summaryFor, resultFor, allAppeals } from '../store.js';
 import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
@@ -35,8 +35,7 @@ function build(patterns) {
   const avg = totals.length ? round2(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
   const running = state.job?.status === 'running';
 
-  const sub = [`Набор ${state.group} · ${recs.length} ${pluralRu(recs.length, 'диалог', 'диалога', 'диалогов')}`];
-  if (evaluated.length) sub.push(`оценено ${evaluated.length}`);
+  const sub = [`Оценено ${evaluated.length} из ${recs.length} ${pluralRu(recs.length, 'диалога', 'диалогов', 'диалогов')}`];
   if (avg != null) sub.push(`средний балл ${fmtScore(avg)}`);
   const action = running
     ? h('span', { class: 'muted' }, 'Идёт оценка…')
@@ -56,7 +55,7 @@ function build(patterns) {
           ? 'Оценки появятся здесь по мере готовности.'
           : 'Система проверит диалоги по чек-листу: выставит баллы, объяснит каждое решение и отметит грубые ошибки.'),
         running ? null : h('div', { class: 'start-actions' },
-          h('button', { class: 'btn btn-secondary', onclick: () => startEvaluation(first5) }, `Оценить первые ${first5.length}`),
+          pendingIds.length > first5.length && h('button', { class: 'btn btn-secondary', onclick: () => startEvaluation(first5) }, `Оценить первые ${first5.length}`),
           h('button', { class: 'btn btn-primary', onclick: () => startEvaluation(pendingIds) }, `Оценить все ${pendingIds.length}`))));
   }
 
@@ -64,7 +63,6 @@ function build(patterns) {
     h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)), patterns);
 }
 
-const LOW = 65; // Individual dialog scores below this threshold need attention.
 const UNNAMED = new Set(['Не представился', '[Имя скрыто]', '']);
 const isToday = (iso) => { if (!iso) return false; const d = new Date(iso); const n = new Date(); return d.toDateString() === n.toDateString(); };
 
@@ -77,48 +75,44 @@ function queueCards(evaluated) {
   const decidedToday = appeals.filter((x) => x.appeal.status !== 'pending' && isToday(x.appeal.decision?.decidedAt)).length;
   const ops = operatorStats(evaluated);
 
-  const line = (n, text, href) => h('a', { class: `q-line ${n ? '' : 'zero'}`, href }, h('b', null, n), ` ${text}`);
-  const card = (title, lines, btn, cls = '') => h('div', { class: `card q-card ${cls}` }, h('h3', { class: 'card-title' }, title), h('div', { class: 'q-lines' }, lines), h('div', { class: 'q-foot' }, btn));
+  const line = (n, text, href) => h('a', { class: 'q-line', href }, h('b', null, n), ` ${text}`);
+  const card = (title, lines, cls = '') => h('div', { class: `card q-card ${cls}` }, h('h3', { class: 'card-title' }, title), h('div', { class: 'q-lines' }, lines));
   return h('div', { class: 'queue-cards' },
     card('Требуют разбора', [
-      line(gross, pluralRu(gross, 'грубая ошибка', 'грубые ошибки', 'грубых ошибок'), '#/dialogs?f=gross'),
-      line(disputed, pluralRu(disputed, 'спорная оценка', 'спорные оценки', 'спорных оценок'), '#/dialogs?f=disputed'),
-    ], gross || disputed || waiting
-      ? h('a', { class: 'btn btn-secondary btn-sm', href: '#/dialogs?f=review' }, 'Открыть очередь')
-      : h('span', { class: 'muted' }, 'Всё разобрано')),
+      gross > 0 && line(gross, pluralRu(gross, 'грубая ошибка', 'грубые ошибки', 'грубых ошибок'), '#/dialogs?f=gross'),
+      disputed > 0 && line(disputed, pluralRu(disputed, 'спорная оценка', 'спорные оценки', 'спорных оценок'), '#/dialogs?f=disputed'),
+      !gross && !disputed && h('span', { class: 'muted' }, 'Нет грубых ошибок и спорных оценок для разбора'),
+    ]),
     card('Апелляции', [
-      line(waiting, waiting === 1 ? 'ждёт решения' : 'ждут решения', '#/appeals'),
-      line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals'),
-    ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : decidedToday ? 'Открыть апелляции' : 'Нет открытых'), waiting || decidedToday ? 'appeals-card' : 'appeals-card quiet'),
-    card('Операторы', ops.total ? [
-      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ` ${pluralRu(ops.repeat, 'оператор', 'оператора', 'операторов')} с низким баллом в двух и более диалогах — смотреть в первую очередь`),
-      h('div', { class: 'q-line plain' }, `${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')} с низким баллом в одном диалоге — пока не закономерность`),
-      ops.weakest ? h('a', { class: 'q-line plain', href: `#/operators/${encodeURIComponent(ops.weakest.name)}` },
-        `Самый низкий средний балл: ${ops.weakest.name} · ${fmtScore(ops.weakest.avg)} · ${ops.weakest.n} ${pluralRu(ops.weakest.n, 'диалог', 'диалога', 'диалогов')}`) : null,
-    ] : [h('div', { class: 'q-line plain' }, 'Имена операторов появятся после оценки')],
-    h('a', { class: 'btn btn-secondary btn-sm', href: '#/operators' }, 'К операторам')));
+      waiting > 0 && line(waiting, pluralRu(waiting, 'ждёт решения', 'ждут решения', 'ждут решения'), '#/appeals?tab=pending'),
+      decidedToday > 0 && line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals?tab=done'),
+      !waiting && !decidedToday && h('span', { class: 'muted' }, 'Нет открытых апелляций'),
+    ], waiting || decidedToday ? 'appeals-card' : 'appeals-card quiet'),
+    card('Операторы', ops.single || ops.repeat ? [
+      h('span', { class: 'muted' }, `Оценка ниже ${LOW_SCORE_THRESHOLD} баллов`),
+      operatorLink(ops.repeat, 'repeat', 'в двух и более диалогах'),
+      operatorLink(ops.single, 'single', 'в одном диалоге'),
+    ] : [h('span', { class: 'muted' }, ops.total ? `Нет оценок ниже ${LOW_SCORE_THRESHOLD} баллов` : 'Пока нет оценок для известных операторов')]));
 }
 
-/** Operators of the evaluated dialogs: how many, how many average below LOW, who is lowest. */
+function operatorLink(n, filter, label) {
+  if (!n) return null;
+  return h('a', { class: 'operator-count-link', href: `#/operators?low=${filter}` },
+    h('span', null, h('b', null, `${n} ${pluralRu(n, 'оператор', 'оператора', 'операторов')}`), ' · ', label),
+    h('span', { 'aria-hidden': 'true' }, '→'));
+}
+
 function operatorStats(evaluated) {
-  const per = new Map();
+  const counts = new Map();
   for (const r of evaluated) {
     const name = (resultFor(r.conversation_id)?.operator || '').trim();
-    const total = summaryFor(r.conversation_id)?.total;
-    if (UNNAMED.has(name) || total == null) continue;
-    const p = per.get(name) || { sum: 0, n: 0, low: 0 };
-    p.sum += total; p.n += 1;
-    if (total < LOW) p.low += 1;
-    per.set(name, p);
+    const score = summaryFor(r.conversation_id)?.total;
+    if (!UNNAMED.has(name) && score != null) {
+      counts.set(name, (counts.get(name) || 0) + Number(score < LOW_SCORE_THRESHOLD));
+    }
   }
-  let weakest = null, single = 0, repeat = 0;
-  for (const [name, p] of per) {
-    const avg = p.sum / p.n;
-    if (p.low === 1) single += 1;
-    if (p.low >= 2) repeat += 1;
-    if (!weakest || avg < weakest.avg) weakest = { name, avg, n: p.n };
-  }
-  return { total: per.size, single, repeat, weakest };
+  const lows = [...counts.values()];
+  return { total: counts.size, single: lows.filter((n) => n === 1).length, repeat: lows.filter((n) => n >= 2).length };
 }
 
 function criteriaCard(evaluated) {

@@ -68,10 +68,11 @@ function buildShell(root) {
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
 
   const ribbon = h('header', { class: 'ribbon' },
-    h('a', { class: 'rb-brand', href: '#/', 'aria-label': 'Freedom Broker · Главная' },
+    h('div', { class: 'rb-brand' },
       h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
-      h('span', { class: 'rb-name' }, 'Freedom Broker'),
-      h('span', { class: 'rb-title' }, 'Контроль качества')),
+      h('span', { class: 'brand-copy' },
+        h('strong', { class: 'rb-name' }, 'Freedom Broker'),
+        h('span', { class: 'rb-title' }, 'Контроль качества'))),
     ui.tabs, ui.right);
 
   const d365Top = h('div', { class: 'cqa-d365-top' },
