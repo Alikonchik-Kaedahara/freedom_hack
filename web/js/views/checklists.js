@@ -193,7 +193,7 @@ export function renderChecklists(root, id) {
     bar.setAttribute('class', 'alloc'); bar.setAttribute('viewBox', '0 0 1000 28'); bar.setAttribute('preserveAspectRatio', 'none');
     bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', `Сумма весов ${sum} из 100`);
     const bg = document.createElementNS(NS, 'rect');
-    Object.entries({ x: 0, y: 0, width: 1000, height: 28, fill: '#EEF2F0' }).forEach(([k, v]) => bg.setAttribute(k, v));
+    Object.entries({ x: 0, y: 0, width: 1000, height: 28, class: 'trk' }).forEach(([k, v]) => bg.setAttribute(k, v));
     bar.append(bg);
     let x = 0;
     weighted.forEach((c, i) => {
@@ -254,7 +254,7 @@ export function renderChecklists(root, id) {
     return h('div', { class: 'card card-pad' },
       h('h3', { class: 'card-title' }, 'Применение'),
       cmp ? h('div', null,
-        h('div', { style: { color: 'var(--cqa-muted)', fontSize: '13px' } }, `Средний балл · ${cmp.n} ${pluralRu(cmp.n, 'диалог', 'диалога', 'диалогов')}`),
+        h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px' } }, `Средний балл · ${cmp.n} ${pluralRu(cmp.n, 'диалог', 'диалога', 'диалогов')}`),
         h('div', { class: 'compare' },
           h('div', { class: 'c old' }, h('small', null, `Версия ${cmp.oldVersion}`), h('b', null, fmtScore(cmp.old))),
           h('span', { class: 'arr' }, icon('right', 26, 2.5)),
@@ -264,7 +264,7 @@ export function renderChecklists(root, id) {
         class: 'btn btn-primary btn-lg btn-block', disabled: dirty || !valid || running || !ids.length,
         onclick: apply,
       }, icon('sparkles', 18), ids.length ? `Применить к ${ids.length} ${pluralRu(ids.length, 'диалогу', 'диалогам', 'диалогам')}` : 'Нет диалогов этого канала'),
-      dirty ? h('div', { style: { color: 'var(--cqa-muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px' } }, 'Сначала сохраните изменения') : null);
+      dirty ? h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px' } }, 'Сначала сохраните изменения') : null);
   }
 
   // Average total for dialogs re-evaluated with the current version vs their previous evaluation.

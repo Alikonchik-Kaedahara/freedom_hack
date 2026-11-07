@@ -52,7 +52,7 @@ function row({ result, appeal }) {
     h('div', { class: 'comment' }, `«${appeal.comment}»`),
     h('div', { class: 'right' },
       h('span', { class: `tag ${st[0]}` }, st[1]),
-      h('span', { style: { color: 'var(--cqa-muted)', fontSize: '12.5px' } }, fmtDate(appeal.createdAt))));
+      h('span', { style: { color: 'var(--cqa-text-muted)', fontSize: '12.5px' } }, fmtDate(appeal.createdAt))));
 }
 
 export function openReview(result, appeal, opts = {}) {
@@ -123,7 +123,7 @@ export function openReview(result, appeal, opts = {}) {
         h('div', { class: 'quote' }, appeal.comment),
         h('div', { class: 'rm-ai' }, h('span', { class: `tag ${aiV.cls === 'ok' ? 'green' : aiV.cls === 'fail' ? 'red' : aiV.cls === 'part' ? 'amber' : ''}` },
           `ИИ: ${aiV.text}${c.type === 'scale' && aiV.text !== 'N/A' ? ` / ${aiV.max}` : ''}`), h('span', null, ai.explanation || '')),
-        ai.confidence ? h('div', { style: { fontSize: '12px', color: 'var(--cqa-muted)', marginTop: '6px' } },
+        ai.confidence ? h('div', { style: { fontSize: '12px', color: 'var(--cqa-text-muted)', marginTop: '6px' } },
           `Уверенность модели: ${CONFIDENCE_LABEL[ai.confidence] || ai.confidence}`,
           disputeLabel(ai) ? ` · ${disputeLabel(ai).text}${ai.issues?.length ? `: ${ai.issues.join(' ')}` : ''}` : '') : null,
         idx.size ? fragment : null),

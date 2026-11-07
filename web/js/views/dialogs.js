@@ -78,7 +78,7 @@ export function renderDialogs(root) {
           h('div', null, h('b', null, r.path), ` — записей ${r.total}: ok ${r.ok}, error ${r.error} · model.mode ${r.mode} (${r.modelName})`),
           r.replay?.length ? h('div', { class: 'import-error' }, `${r.replay.length} ${pluralRu(r.replay.length, 'результат получен', 'результата получены', 'результатов получены')} движком replay и выгружены как error — для сдачи оцените их реальной моделью`) : null,
           ...Object.entries(r.errors || {}).slice(0, 8).map(([cid, why]) => h('div', { class: 'muted' }, `error ${cid}: ${why}`)),
-          r.problems?.length ? h('div', { class: 'import-error' }, 'Проблемы формата: ' + r.problems.slice(0, 5).join('; ')) : h('div', { style: { color: 'var(--cqa-emerald)' } }, 'Формат проверен: проблем нет'),
+          r.problems?.length ? h('div', { class: 'import-error' }, 'Проблемы формата: ' + r.problems.slice(0, 5).join('; ')) : h('div', { style: { color: 'var(--cqa-brand-primary)' } }, 'Формат проверен: проблем нет'),
           h('a', { class: 'btn btn-secondary', href: `${window.CQA_API_BASE || ''}/api/export/${dataset}/download`, download: `results-${dataset}.json` }, icon('download', 16), 'Скачать файл'),
           h('div', { class: 'muted', style: { fontSize: '13px' } }, 'Файл уже записан в папку results/ репозитория — осталось git add, commit и push.'),
         ];
@@ -139,10 +139,10 @@ export function renderDialogs(root) {
     footHost.replaceChildren(h('div', { class: 'table-foot' },
       h('span', null, rows.length === state.records.length ? `${rows.length} ${pluralRu(rows.length, 'диалог', 'диалога', 'диалогов')}` : `Показано ${rows.length} из ${state.records.length}`),
       h('span', { class: 'mx-legend' },
-        h('span', null, h('i', { style: { background: 'var(--cqa-emerald-bright)' } }), 'Да / максимум'),
-        h('span', null, h('i', { style: { background: 'var(--cqa-amber-fill)' } }), 'Частично'),
-        h('span', null, h('i', { style: { background: 'var(--cqa-red)' } }), 'Нет / 0'),
-        h('span', null, h('i', { style: { background: 'var(--cqa-surface-3)' } }), 'N/A'))));
+        h('span', null, h('i', { class: 'ok' }), 'Да / максимум'),
+        h('span', null, h('i', { class: 'part' }), 'Частично'),
+        h('span', null, h('i', { class: 'fail' }), 'Нет / 0'),
+        h('span', null, h('i', { class: 'na' }), 'N/A'))));
   };
 
   const row = (r) => {
