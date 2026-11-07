@@ -1070,6 +1070,8 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .drop-zone:hover,
 #cqa-d365-root .drop-zone:focus-visible,
 #cqa-d365-root .drop-zone.over { border-color: var(--cqa-brand-primary); background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+#cqa-d365-root .num,
+#cqa-d365-root .num * { font-family: var(--cqa-font-sans); letter-spacing: 0; }
 @media (max-width: 1560px) {
 #cqa-d365-root .rb-tabs a .ic { display: none; }
 #cqa-d365-root .rb-tabs a { padding: 0 9px; }
@@ -1270,7 +1272,8 @@ from { transform: translateY(100%); }
 }
 @media (max-width: 820px) {
 #cqa-d365-root .kb-how-grid { grid-template-columns: 1fr; gap: 10px; }
-#cqa-d365-root .patterns { grid-template-columns: 1fr; }
+#cqa-d365-root .patterns { grid-template-columns: minmax(0, 1fr); }
+#cqa-d365-root .pattern .p-head .tag { white-space: normal; margin-left: 0; }
 #cqa-d365-root .tstrip.tstrip-4 { grid-template-columns: 1fr 1fr; }
 #cqa-d365-root .tstrip.tstrip-4 .tcell:last-child { grid-column: auto; border-left: 1px solid var(--cqa-border-hairline); }
 #cqa-d365-root .qtable { min-width: 440px; }

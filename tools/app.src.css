@@ -1099,6 +1099,8 @@ a.q-line:hover b { text-decoration: underline; }
 .drop-zone b { color: var(--cqa-text-primary); font-weight: 600; font-size: 13.5px; }
 .drop-zone .muted { font-size: 12.5px; }
 .drop-zone:hover, .drop-zone:focus-visible, .drop-zone.over { border-color: var(--cqa-brand-primary); background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+/* Numbers are never monospace (style rule 1): .num cells use the UI font with tabular figures. */
+.num, .num * { font-family: var(--cqa-font-sans); letter-spacing: 0; }
 
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
@@ -1299,7 +1301,8 @@ a.q-line:hover b { text-decoration: underline; }
 /* ============ Phones: new screens ============ */
 @media (max-width: 820px) {
   .kb-how-grid { grid-template-columns: 1fr; gap: 10px; }
-  .patterns { grid-template-columns: 1fr; }
+  .patterns { grid-template-columns: minmax(0, 1fr); }
+  .pattern .p-head .tag { white-space: normal; margin-left: 0; }
   .tstrip.tstrip-4 { grid-template-columns: 1fr 1fr; }
   .tstrip.tstrip-4 .tcell:last-child { grid-column: auto; border-left: 1px solid var(--cqa-border-hairline); }
   .qtable { min-width: 440px; }
