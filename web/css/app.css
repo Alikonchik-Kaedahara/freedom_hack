@@ -1438,7 +1438,7 @@ from { transform: translateY(100%); }
 #cqa-d365-root .criterion-options .cb,
 #cqa-d365-root .criterion-order .cb { align-self: start; margin: 1px 0 0; }
 #cqa-d365-root .criterion-options label:has(:checked) { background: var(--cqa-brand-soft); border-radius: 4px; }
-#cqa-d365-root .criterion-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 9px; }
+#cqa-d365-root .criterion-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 0 0 10px; margin-bottom: 6px; border-bottom: 1px solid var(--cqa-border-hairline); }
 #cqa-d365-root .criterion-settings label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 #cqa-d365-root .criterion-settings select { max-width: 100%; }
 #cqa-d365-root .criterion-order { cursor: pointer; }

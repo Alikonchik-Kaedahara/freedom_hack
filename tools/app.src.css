@@ -1467,7 +1467,7 @@ a.q-line:hover b { text-decoration: underline; }
 .criterion-options small { font-variant-numeric: tabular-nums; color: var(--cqa-text-secondary); }
 .criterion-options .cb, .criterion-order .cb { align-self: start; margin: 1px 0 0; }
 .criterion-options label:has(:checked) { background: var(--cqa-brand-soft); border-radius: 4px; }
-.criterion-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin-top: 9px; }
+.criterion-settings { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; padding: 0 0 10px; margin-bottom: 6px; border-bottom: 1px solid var(--cqa-border-hairline); }
 .criterion-settings label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .criterion-settings select { max-width: 100%; }
 .criterion-order { cursor: pointer; }

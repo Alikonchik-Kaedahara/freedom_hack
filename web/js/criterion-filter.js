@@ -69,18 +69,18 @@ export function criterionChoices(checklists) {
 
 export function criterionControls(filter, onChange, registry = false) {
   const caption = h('span', { class: 'criterion-caption' });
-  const summary = h('summary', null, icon('chevron', 14), 'Критерии', caption);
+  const summary = h('summary', null, icon('chevron', 14), 'Критерии и сортировка', caption);
   const options = h('div', { class: 'criterion-options', role: 'group', 'aria-label': 'Выберите критерии' });
   const select = h('select', { class: 'select', onchange: () => { filter.outcome = select.value; changed(); } },
     Object.entries(outcomes).map(([key, label]) => h('option', { value: key }, label)));
   const ordering = h('input', { type: 'checkbox', class: 'cb', onchange: () => { filter.severity = ordering.checked; changed(); } });
   const clear = h('button', { class: 'link-btn', type: 'button', onclick: () => { reset(); summary.focus(); } }, 'Сбросить');
   const hint = registry && h('span', { class: 'muted' }, 'Достаточно совпадения по одному критерию.');
-  const el = h('details', { class: 'criterion-filter' }, summary, options,
+  const el = h('details', { class: 'criterion-filter' }, summary,
     h('div', { class: 'criterion-settings' },
       h('label', null, 'Результат', select),
       h('label', { class: 'criterion-order' }, ordering, 'Сначала невыполненные'),
-      clear), hint);
+      clear), options, hint);
   let choices = [];
   let signature;
 
