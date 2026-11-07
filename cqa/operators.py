@@ -86,6 +86,7 @@ def profiles(records, results):
         g["pending"] += sum(1 for a in res.get("appeals") or [] if a.get("status") == "pending")
         g["languages"][rec.get("language")] = g["languages"].get(rec.get("language"), 0) + 1
         g["channels"][rec.get("channel")] = g["channels"].get(rec.get("channel"), 0) + 1
+        failed, partial = [], []
         for c in res["checklist"]["criteria"]:
             code = c.get("code") or c["id"]
             cs = g["criteria"].setdefault(code, {"code": code, "name": c["name"], "type": c["type"], "applicable": 0, "failed": 0, "partial": 0, "na": 0, "flag": 0})
@@ -98,14 +99,16 @@ def profiles(records, results):
                 cs["applicable"] += 1
                 if p["status"] == "fail":
                     cs["failed"] += 1
+                    failed.append(code)
                 elif p["status"] == "part":
                     cs["partial"] += 1
+                    partial.append(code)
             else:
                 cs["na"] += 1
         g["dialogs"].append({
             "conversationId": rec["conversation_id"], "language": rec.get("language"), "channel": rec.get("channel"),
             "total": s["total"], "gross": s["gross"], "createdAt": res.get("createdAt"),
-            "failed": [c.get("code") or c["id"] for c in res["checklist"]["criteria"] if (s["per"].get(c["id"]) or {}).get("status") == "fail"],
+            "failed": failed, "partial": partial,
             "grossWhy": next((fa[c["id"]].get("explanation") for c in res["checklist"]["criteria"]
                               if c["type"] == "flag" and (fa.get(c["id"]) or {}).get("answer") == "yes"), None),
         })

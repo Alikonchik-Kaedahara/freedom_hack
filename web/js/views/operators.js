@@ -137,36 +137,27 @@ export function renderOperators(root, name) {
 
   // ----- profile -----
   function profile(p) {
-    const crit = h('div', { class: 'card card-pad' },
-      h('h3', { class: 'card-title' }, 'Критерии', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, 'как часто не выполнен')),
-      h('div', { class: 'qtable-wrap' }, h('table', { class: 'qtable' }, h('tbody', null, p.criteria.map((c) => h('tr', null,
-        h('td', { class: 'muted' }, c.code), h('td', null, c.name),
-        c.type === 'flag'
-          ? [h('td', { colspan: 2 }, c.flag ? h('span', { class: 'tag red' }, `${c.flag} ${pluralRu(c.flag, 'диалог', 'диалога', 'диалогов')}`) : h('span', { class: 'muted' }, 'не выявлено'))]
-          : [h('td', { class: 'num muted', title: 'не выполнен / частично / применим' }, c.applicable ? `${c.failed} / ${c.partial} / ${c.applicable}` : `не применим в ${c.na}`),
-            h('td', null, c.failRate == null ? h('span', { class: 'muted' }, '—') : bar(c.failRate))]))))),
-      h('div', { class: 'muted small', style: { marginTop: '8px' } }, 'Числа: не выполнен / частично / применим. Частично считается за половину.'));
-
     const dialogs = h('div', { class: 'card card-pad' },
       h('h3', { class: 'card-title' }, 'Диалоги', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, 'сначала с низким баллом')),
       h('div', { class: 'qtable-wrap' }, h('table', { class: 'triage op-dialogs' }, h('tbody', null, p.dialogs.map((d) => h('tr', null,
         h('td', { class: 'id' }, d.conversationId),
         h('td', null, h('span', { class: 'chan' }, icon(channelIcon(d.channel), 13), d.language)),
         h('td', null, h('span', { class: `score ${scoreClass(d.total)}` }, fmtScore(d.total))),
-        h('td', { class: 'why' }, d.gross ? h('span', { class: 'tag red' }, 'Грубая ошибка') : (d.failed.length ? `не выполнено: ${d.failed.join(', ')}` : h('span', { class: 'muted' }, 'всё выполнено'))),
+        h('td', { class: 'why' }, d.gross ? h('span', { class: 'tag red' }, 'Грубая ошибка') : dialogFindings(d)),
         h('td', { class: 'row-act' }, h('a', { class: 'btn btn-secondary btn-xs', href: `#/dialog/${encodeURIComponent(d.conversationId)}` }, 'Открыть'))))))));
-    return h('div', { class: 'profile-work' }, violations.el, h('div', { class: 'grid two-one' }, dialogs, crit));
-  }
-
-  function bar(v) {
-    const w = Math.max(0, Math.min(100, v || 0));
-    const t = v >= 50 ? 'fail' : v >= 20 ? 'part' : 'ok';
-    return h('div', { class: 'qbar-wrap' }, svg('svg', { class: 'qbar', viewBox: '0 0 100 8', preserveAspectRatio: 'none', role: 'img', 'aria-label': pct(v) },
-      svg('rect', { class: 'trk', x: 0, y: 0, width: 100, height: 8, rx: 2 }), svg('rect', { class: t, x: 0, y: 0, width: w, height: 8, rx: 2 })), h('span', { class: 'small' }, pct(v)));
+    return h('div', { class: 'profile-work' }, violations.el, dialogs);
   }
 
   load();
   return subscribe((w) => { if (w === 'results' || (w === 'job' && !state.job)) load(); }); // results change; job finished
+}
+
+function dialogFindings(dialog) {
+  const parts = [];
+  const count = (n) => `${n} ${pluralRu(n, 'критерий', 'критерия', 'критериев')}`;
+  if (dialog.failed.length) parts.push('Не выполнено: ' + count(dialog.failed.length));
+  if (dialog.partial?.length) parts.push('Частично: ' + count(dialog.partial.length));
+  return parts.length ? parts.join(' · ') : h('span', { class: 'muted' }, dialog.total == null ? 'Нет оценки' : 'Без нарушений');
 }
 
 function initials(name) {

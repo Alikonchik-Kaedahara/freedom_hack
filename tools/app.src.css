@@ -827,15 +827,6 @@ p { margin: 0; }
 .qtable td:nth-child(2) { min-width: 160px; }
 .qtable details summary { cursor: pointer; color: var(--cqa-brand-primary); font-weight: 600; font-size: 12.5px; list-style: none; white-space: nowrap; }
 .qtable details summary::-webkit-details-marker { display: none; }
-.qbar { display: block; width: 100%; min-width: 90px; height: 8px; }
-.qbar .trk { fill: var(--cqa-bg-sunken); }
-.qbar .ok { fill: var(--cqa-pass-solid); }
-.qbar .part { fill: var(--cqa-warn-solid); }
-.qbar .fail { fill: var(--cqa-fail-solid); }
-.qbar .none { fill: var(--cqa-border-strong); }
-.qbar-wrap { display: flex; align-items: center; gap: 8px; }
-.qbar-wrap .qbar { flex: 1; }
-.qbar-wrap span { width: 36px; text-align: right; color: var(--cqa-text-secondary); }
 .q-tag-ok { border-color: var(--cqa-pass-border) !important; color: var(--cqa-pass-text) !important; }
 .q-tag-part { border-color: var(--cqa-warn-border) !important; color: var(--cqa-warn-text) !important; }
 .q-tag-fail { border-color: var(--cqa-fail-border) !important; color: var(--cqa-fail-text) !important; }

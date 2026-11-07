@@ -219,6 +219,8 @@ def test_profiles_aggregate_dialogs_per_operator():
     both = next(p for p in profiles if p["count"] == 2)
     assert both["average"] == scoring.round2((100.0 + 40.5) / 2) and both["min"] == 40.5 and both["max"] == 100.0
     assert both["dialogs"][0]["conversationId"] == "sample-ru-002", "weakest dialog first"
+    assert both["dialogs"][0]["partial"] == ["04", "06"]
+    assert both["dialogs"][1]["partial"] == []
     assert both["languages"] == {"RU": 2} and both["channels"] == {"agent chat": 2}
     c1 = next(c for c in both["criteria"] if c["code"] == "01")
     assert c1["type"] == "binary" and c1["applicable"] == 2 and c1["failed"] == 1 and c1["failRate"] == 50.0
