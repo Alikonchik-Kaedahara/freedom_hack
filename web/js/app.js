@@ -41,6 +41,7 @@ const ROUTES = [
 ];
 
 const HOST_KEY = 'cqa.hostPreview';
+const THEME_KEY = 'cqa.theme';
 const ui = {};
 let cleanup = null;
 let currentPath = null;
@@ -60,9 +61,10 @@ function buildShell(root) {
   ui.pill = h('button', { class: 'ds-pill', type: 'button', 'aria-haspopup': 'dialog' });
   ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
     icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host'));
+  ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая / тёмная тема', 'aria-label': 'Светлая / тёмная тема' }, icon('contrast', 15));
   ui.action = h('div', { class: 'rb-action' });
   ui.bridge = h('span', { class: 'bridge-badge', hidden: true });
-  ui.right = h('div', { class: 'rb-right' }, ui.bridge, ui.pill, ui.host, ui.action);
+  ui.right = h('div', { class: 'rb-right' }, ui.bridge, ui.pill, ui.host, ui.theme, ui.action);
   ui.rail = h('nav', { class: 'cqa-d365-rail', 'aria-label': 'Разделы CQA' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
@@ -89,9 +91,16 @@ function buildShell(root) {
 
   ui.pill.addEventListener('click', (e) => { e.stopPropagation(); openDatasetPopover(ui.right); });
   ui.host.addEventListener('click', () => setHostPreview(!root.classList.contains('cqa-host-on')));
-  root.dataset.theme = 'light';
+  ui.theme.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
+  setTheme(readPref(THEME_KEY) === 'dark' ? 'dark' : 'light', false);
   if (D365Bridge.ready) { ui.host.hidden = true; updateBridge(); } // already inside Dynamics 365
   else setHostPreview(readPref(HOST_KEY) !== '0', false); // the Dynamics 365 frame is the default look
+}
+
+function setTheme(theme, persist = true) {
+  ui.root.dataset.theme = theme;
+  ui.theme.setAttribute('aria-pressed', String(theme === 'dark'));
+  if (persist) writePref(THEME_KEY, theme);
 }
 
 function setHostPreview(on, persist = true) {
