@@ -813,6 +813,7 @@ a { color: inherit; text-decoration: none; }
   .page.fill .head-actions .btn-glass { width: 44px; height: 44px; padding: 0; }
   .btn .btn-label { display: none; }
   .page.fill .head-actions .btn-lg { height: 44px; padding: 0 16px; }
+  .page.fill .page-head .head-actions:has(.btn-lg) { width: auto; flex: none; }
 
   .m-tabs { display: block; position: sticky; top: 0; z-index: 6; margin: 0 -16px 12px; padding: 8px 16px; padding-top: calc(8px + env(safe-area-inset-top)); }
   .m-tabs .segmented { display: flex; width: 100%; background: #fff; border-radius: 15px; padding: 4px; box-shadow: 0 6px 20px rgba(8,49,31,.14); }
