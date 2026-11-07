@@ -175,7 +175,7 @@ DEFAULT_CHECKLISTS = [
 
 DEFAULT_SETTINGS = {
     "engine": "cloud",
-    "cloud": {"model": "claude-opus-5-5", "effort": "medium", "apiKey": ""},
+    "cloud": {"model": "claude-sonnet-5-5", "effort": "medium", "apiKey": ""},
     "local": {"url": "http://localhost:11434", "model": "qwen2.5:14b"},
     "active": {"agent chat": "chat-base", "voice call": "call-base"},
     "activeGroup": "",

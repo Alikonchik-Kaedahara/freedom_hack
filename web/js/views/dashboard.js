@@ -85,10 +85,10 @@ function queueCards(evaluated) {
       line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals'),
     ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : decidedToday ? 'Открыть апелляции' : 'Нет открытых'), waiting || decidedToday ? 'appeals-card' : 'appeals-card quiet'),
     card('Операторы', ops.total ? [
-      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ` ${pluralRu(ops.repeat, 'оператор повторяет', 'оператора повторяют', 'операторов повторяют')} низкие оценки (2+ диалога ниже 65)`),
-      h('div', { class: 'q-line plain' }, `Один низкий диалог: ${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')} — пока не вывод`),
+      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ` ${pluralRu(ops.repeat, 'оператор', 'оператора', 'операторов')} с низким баллом в двух и более диалогах — смотреть в первую очередь`),
+      h('div', { class: 'q-line plain' }, `${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')} с низким баллом в одном диалоге — пока не закономерность`),
       ops.weakest ? h('a', { class: 'q-line plain', href: `#/operators/${encodeURIComponent(ops.weakest.name)}` },
-        `Минимум: ${ops.weakest.name} · ${fmtScore(ops.weakest.avg)} · ${ops.weakest.n} ${pluralRu(ops.weakest.n, 'диалог', 'диалога', 'диалогов')}`) : null,
+        `Самый низкий средний балл: ${ops.weakest.name} · ${fmtScore(ops.weakest.avg)} · ${ops.weakest.n} ${pluralRu(ops.weakest.n, 'диалог', 'диалога', 'диалогов')}`) : null,
     ] : [h('div', { class: 'q-line plain' }, 'Имена операторов появятся после оценки')],
     h('a', { class: 'btn btn-secondary btn-sm', href: '#/operators' }, 'К операторам')));
 }

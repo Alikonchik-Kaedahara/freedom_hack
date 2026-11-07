@@ -202,6 +202,13 @@ function openMoreSheet(items, path) {
   ui.root.append(sheet);
 }
 
+/** Browser tab and history show where the person is: «Диалог p1-ru-005 · Контроль качества». */
+function setTitle(path) {
+  const dialog = path.match(/^\/dialog\/(.+)$/);
+  const section = dialog ? `Диалог ${decodeURIComponent(dialog[1])}` : (NAV.find((item) => isActive(item, path))?.label || 'Контроль качества');
+  document.title = section === 'Главная' ? 'Контроль качества диалогов · Freedom Broker' : `${section} · Контроль качества`;
+}
+
 function route() {
   const path = currentRoute();
   for (const [re, to] of REDIRECTS) {
@@ -212,6 +219,7 @@ function route() {
   const samePage = path === currentPath;
   currentPath = path;
   renderChrome();
+  setTitle(path);
   ui.root.querySelector('.user-menu')?.remove();
   ui.root.querySelector('.more-sheet')?.remove();
   clear(ui.view);

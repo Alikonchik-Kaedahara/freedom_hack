@@ -1427,3 +1427,8 @@ a.q-line:hover b { text-decoration: underline; }
   .op-mobile-count { display: block; font-size: 12px; color: var(--cqa-text-secondary); }
   .toolbar.reg-toolbar .chips { flex-wrap: wrap; width: 100%; margin: 0; padding: 0; gap: 4px; }
 }
+
+/* People who asked their system for less motion get none: no spinners' spin, no pulses, no sliding sheets. */
+@media (prefers-reduced-motion: reduce) {
+  :scope *, :scope *::before, :scope *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}

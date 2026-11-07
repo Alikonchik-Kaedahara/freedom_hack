@@ -164,7 +164,7 @@ export function openReview(result, appeal) {
         h('label', { class: 'field-label' }, 'Основание решения'),
         reason,
         decided ? h('div', { class: 'who-line' }, `Решил: ${byLine(appeal.decision?.by, appeal.decision?.decidedAt) || '—'}`) : null,
-        h('a', { class: 'link-btn', href: `#/dialog/${encodeURIComponent(result.conversationId)}`, onclick: () => m.close() }, 'Открыть диалог', icon('right', 15)))),
+        h('a', { class: 'link-btn', href: `#/dialog/${encodeURIComponent(result.conversationId)}?criterion=${encodeURIComponent(appeal.criterionId)}`, onclick: () => m.close() }, 'Открыть диалог на этом критерии', icon('right', 15)))),
     recalcHost);
 
   const m = openModal({
