@@ -89,6 +89,7 @@
   --cqa-bar-good: #2FBF71;
   --cqa-bar-low: #F0605D;
   --cqa-bar-track: #2A2F35;
+  --cqa-bar-mid: #D9A21B;
   --cqa-pass-text: #4ADE80;
   --cqa-pass-bg: rgba(74, 222, 128, .1);
   --cqa-pass-border: rgba(74, 222, 128, .3);
@@ -707,6 +708,7 @@ p { margin: 0; }
   --cqa-bar-good: #009951;
   --cqa-bar-low: #EF4444;
   --cqa-bar-track: #E8EDEA;
+  --cqa-bar-mid: #EAB308;
   --cqa-ribbon: 52px;
   --cqa-chrome: 52px;
   --cqa-shadow: none;
@@ -769,6 +771,8 @@ p { margin: 0; }
 /* criteria chart and triage, as in the mockup */
 .cchart .ok { fill: var(--cqa-bar-good); }
 .cchart .fail { fill: var(--cqa-bar-low); }
+.cchart .part { fill: var(--cqa-bar-mid); }
+.legend-inline i.part { background: var(--cqa-bar-mid); }
 .cchart .trk { fill: var(--cqa-bar-track); }
 .legend-inline i.ok { background: var(--cqa-bar-good); }
 .legend-inline i.fail { background: var(--cqa-bar-low); }

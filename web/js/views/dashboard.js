@@ -5,7 +5,6 @@ import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 import { setRibbonAction } from '../app.js';
 
-const TARGET = 80; // quality target shown next to the average score
 const SVGNS = 'http://www.w3.org/2000/svg';
 const MODEL_LABEL = { 'claude-opus-5-5': 'Claude Opus 5.5', 'claude-sonnet-5-5': 'Claude Sonnet 5.5', 'claude-haiku-5-5': 'Claude Haiku 5.5' };
 
@@ -52,7 +51,7 @@ function build() {
   const usage = costInfo(evaluated);
   const strip = h('div', { class: 'card tstrip' },
     cell('Средний балл', h('span', { class: 'val' }, h('span', { class: `score ${scoreClass(avg)}` }, fmtScore(avg)), h('small', null, '/ 100')),
-      avg == null ? 'нет оценок' : h('span', { class: `target ${avg >= TARGET ? 'up' : 'down'}` }, `${avg >= TARGET ? '▲' : '▼'} цель ${TARGET}`)),
+      avg == null ? 'нет оценок' : `по ${totals.length} ${pluralRu(totals.length, 'диалогу', 'диалогам', 'диалогам')}`),
     cell('Проверено диалогов', h('span', { class: 'val' }, evaluated.length, h('small', null, `из ${recs.length}`)),
       h('div', { class: 'stack-foot' }, progressSvg(pct), h('span', null, `${chats} ${pluralRu(chats, 'чат', 'чата', 'чатов')} · ${calls} ${pluralRu(calls, 'звонок', 'звонка', 'звонков')}`)), { stack: true }),
     cell(['Грубые ошибки', h('span', { class: 'mono' }, ' · Крит. 08')], h('span', { class: 'val' }, gross),
@@ -139,7 +138,7 @@ function criteriaCard(evaluated) {
     rows.map((a, i) => {
       const y = i * rowH + 4;
       const pct = a.n ? a.sum / a.n : null;
-      const tone = pct == null ? 'none' : pct >= 0.7 ? 'ok' : 'fail';
+      const tone = pct == null ? 'none' : pct >= 0.85 ? 'ok' : pct >= 0.6 ? 'part' : 'fail';
       const name = a.name.length > maxName ? `${a.name.slice(0, maxName - 1)}…` : a.name;
       return svg('g', null,
         svg('text', { class: 'code', x: 0, y: y + 15 }, a.code),
@@ -153,8 +152,9 @@ function criteriaCard(evaluated) {
     h('h3', { class: 'card-title' }, 'Выполнение критериев 01–07', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, `по ${evaluated.length} ${pluralRu(evaluated.length, 'диалогу', 'диалогам', 'диалогам')}`)),
     chart,
     h('div', { class: 'legend-inline' },
-      h('span', null, h('i', { class: 'ok' }), 'Выполняется (≥ 70%)'),
-      h('span', null, h('i', { class: 'fail' }), 'Проблемная зона (< 70%)'),
+      h('span', null, h('i', { class: 'ok' }), 'Хорошо (≥ 85%)'),
+      h('span', null, h('i', { class: 'part' }), 'Средне (60–84%)'),
+      h('span', null, h('i', { class: 'fail' }), 'Проблемная зона (< 60%)'),
       h('span', null, 'N/A — критерий неприменим')),
     segments(evaluated));
 }

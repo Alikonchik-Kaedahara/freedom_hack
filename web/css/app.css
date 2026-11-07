@@ -80,6 +80,7 @@
   --cqa-bar-good: #2FBF71;
   --cqa-bar-low: #F0605D;
   --cqa-bar-track: #2A2F35;
+  --cqa-bar-mid: #D9A21B;
   --cqa-pass-text: #4ADE80;
   --cqa-pass-bg: rgba(74, 222, 128, .1);
   --cqa-pass-border: rgba(74, 222, 128, .3);
@@ -667,6 +668,7 @@ from { opacity: 0; transform: translateY(6px); }
   --cqa-bar-good: #009951;
   --cqa-bar-low: #EF4444;
   --cqa-bar-track: #E8EDEA;
+  --cqa-bar-mid: #EAB308;
   --cqa-ribbon: 52px;
   --cqa-chrome: 52px;
   --cqa-shadow: none; }
@@ -716,6 +718,8 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .tcell .stack-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; font-size: 12px; color: var(--cqa-text-muted); }
 #cqa-d365-root .cchart .ok { fill: var(--cqa-bar-good); }
 #cqa-d365-root .cchart .fail { fill: var(--cqa-bar-low); }
+#cqa-d365-root .cchart .part { fill: var(--cqa-bar-mid); }
+#cqa-d365-root .legend-inline i.part { background: var(--cqa-bar-mid); }
 #cqa-d365-root .cchart .trk { fill: var(--cqa-bar-track); }
 #cqa-d365-root .legend-inline i.ok { background: var(--cqa-bar-good); }
 #cqa-d365-root .legend-inline i.fail { background: var(--cqa-bar-low); }
