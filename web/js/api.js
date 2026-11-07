@@ -1,7 +1,13 @@
 // Thin client for the CQA server API. All paths are relative so the UI can be
 // hosted under any base path (e.g. as a Dynamics 365 web resource behind a proxy).
 
-const BASE = window.CQA_API_BASE || '';
+let BASE = window.CQA_API_BASE || '';
+
+/** Point the widget at a CQA server on another origin (e.g. when embedded in Dynamics 365). */
+export function setApiBase(base) {
+  BASE = (base || '').replace(/\/$/, '');
+  window.CQA_API_BASE = BASE;
+}
 
 async function req(method, url, body) {
   const res = await fetch(BASE + url, {

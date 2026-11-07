@@ -163,6 +163,22 @@ tests/               pytest + node --test
 
 Интерфейс — чистые HTML/CSS/JS без сборщика, все запросы идут по относительным путям (`window.CQA_API_BASE` задаёт префикс), поэтому его можно встроить как веб-ресурс Dynamics 365.
 
+## Встраивание в Dynamics 365
+
+Интерфейс — один модульный виджет без внешних зависимостей (ни CDN, ни библиотек; иконки, графики и звуковая волна — inline SVG). Все стили ограничены контейнером `#cqa-d365-root` и переменными `--cqa-*`, поэтому не протекают на страницу CRM.
+
+```html
+<link rel="stylesheet" href="css/app.css">
+<div id="cqa"></div>
+<script type="module" src="js/app.js"></script>
+<script>FreedomCQA.mount(document.getElementById('cqa'), { apiBase: 'https://web-production-a39c80.up.railway.app', groupId: 'DEV' });</script>
+```
+
+- `js/bridge.js` (`CQA.D365Bridge`) находит `Xrm` в своём окне или родительском фрейме, читает пользователя и id записи из параметров веб-ресурса (`id`, `data=groupId=…&conversationId=…`) и обменивается сообщениями с формой через `postMessage`: виджет отправляет `ready`, `route`; форма может прислать `open-dialog` (открыть диалог) и `set-group` (сменить набор).
+- Модули: `store.js` (состояние, активный набор), `scoring.js` (перераспределение N/A, шкалы, округление, флаг 08), `api.js` (запросы к серверу, `setApiBase`), `bridge.js`, `app.js` (лента команд, маршруты, `mount`).
+- Кнопка «D365 Host Preview» в ленте показывает, как компонент выглядит внутри рабочего пространства Dynamics 365 (это предпросмотр; статус «Xrm.WebApi Bridge: Ready» появляется только при реальном Xrm).
+- Стили правятся в `tools/app.src.css`, затем `python tools/prefix_css.py tools/app.src.css web/css/app.css`.
+
 ## API
 
 | Метод | Путь | Назначение |

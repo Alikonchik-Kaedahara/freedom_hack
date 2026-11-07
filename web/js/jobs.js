@@ -1,7 +1,7 @@
 // Evaluation jobs: start, poll, show progress in the dock.
 import { api } from './api.js';
 import { state, emit, refreshResults } from './store.js';
-import { h, toast, clear, pluralRu } from './ui.js';
+import { h, toast, clear, pluralRu, layer } from './ui.js';
 
 let timer = null;
 
@@ -88,7 +88,7 @@ function finish(j) {
 }
 
 function renderDock() {
-  const dock = clear(document.getElementById('dock'));
+  const dock = clear(layer('dock'));
   const j = state.job;
   if (!j) return;
   const finished = j.done + j.failed;

@@ -1,8 +1,12 @@
-// App shell: sidebar, dataset switcher, hash router.
-import { h, icon, clear, toast } from './ui.js';
-import { state, boot, subscribe, pendingAppeals } from './store.js';
+// FreedomCQA widget: shell (embedded command ribbon, optional Dynamics 365 host preview), router
+// and the public mount() entry point. Everything renders inside #cqa-d365-root.
+import { h, icon, clear, toast, setLayers } from './ui.js';
+import { api, setApiBase } from './api.js';
+import { state, boot, subscribe, pendingAppeals, loadGroup } from './store.js';
+import * as Scoring from './scoring.js';
 import { resumeJobs } from './jobs.js';
-import { renderImportStage, openDatasetModal } from './views/import.js';
+import { D365Bridge } from './bridge.js';
+import { renderImportStage, openDatasetPopover } from './views/import.js';
 import { renderDashboard } from './views/dashboard.js';
 import { renderDialogs } from './views/dialogs.js';
 import { renderDialog } from './views/dialog.js';
@@ -11,11 +15,11 @@ import { renderChecklists } from './views/checklists.js';
 import { renderModel } from './views/model.js';
 
 const NAV = [
-  { path: '/', label: 'Обзор', icon: 'grid' },
-  { path: '/dialogs', label: 'Диалоги', icon: 'list' },
-  { path: '/appeals', label: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
-  { path: '/checklists', label: 'Чек-листы', icon: 'checks' },
-  { path: '/model', label: 'Модель', icon: 'cpu' },
+  { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid' },
+  { path: '/dialogs', label: 'Реестр диалогов', short: 'Диалоги', icon: 'list' },
+  { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
+  { path: '/checklists', label: 'Конструктор чек-листа', short: 'Чек-листы', icon: 'checks' },
+  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu' },
 ];
 
 const ROUTES = [
@@ -27,41 +31,87 @@ const ROUTES = [
   [/^\/model$/, renderModel],
 ];
 
-const view = document.getElementById('view');
-const main = document.getElementById('main');
+const HOST_KEY = 'cqa.hostPreview';
+const ui = {};
 let cleanup = null;
 let currentPath = null;
+let mounted = false;
 
-function currentRoute() {
-  return decodeURI(location.hash.replace(/^#/, '') || '/');
+const currentRoute = () => decodeURI(location.hash.replace(/^#/, '') || '/');
+const isActive = (item, path) => (item.path === '/' ? path === '/' : path.startsWith(item.path) || (item.path === '/dialogs' && path.startsWith('/dialog/')));
+
+/** Views put their main evaluation button into the ribbon (desktop); phones keep it in the page head. */
+export function setRibbonAction(node) {
+  if (ui.action) ui.action.replaceChildren(...(node ? [node] : []));
 }
 
-function renderNav() {
+function buildShell(root) {
+  ui.root = root;
+  ui.tabs = h('nav', { class: 'rb-tabs', 'aria-label': 'Разделы CQA' });
+  ui.pill = h('button', { class: 'ds-pill', type: 'button', 'aria-haspopup': 'dialog' });
+  ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
+    icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host Preview'));
+  ui.action = h('div', { class: 'rb-action' });
+  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.host, ui.action);
+  ui.bridge = h('span', { class: 'bridge' });
+  ui.view = h('div', { class: 'cqa-view' });
+  ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
+
+  const ribbon = h('header', { class: 'ribbon' },
+    h('a', { class: 'rb-brand', href: '#/' },
+      h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
+      h('span', { class: 'word' }, h('b', null, 'FREEDOM'), h('small', null, 'BROKER')),
+      h('span', { class: 'rb-badge' }, 'CQA Web Resource')),
+    ui.tabs, ui.right);
+
+  const d365Top = h('div', { class: 'cqa-d365-top' },
+    h('span', { class: 'waffle' }, Array.from({ length: 9 }, () => h('i'))),
+    h('span', { class: 'prod' }, 'Dynamics 365'), h('span', { class: 'sep' }),
+    h('span', { class: 'app' }, 'Freedom Broker — Омниканальный контроль качества'),
+    ui.bridge, h('span', { class: 'avatar' }, 'FB'));
+  const d365Rail = h('div', { class: 'cqa-d365-rail' },
+    h('span', null, icon('home', 18)), h('span', null, icon('clockR', 18)), h('span', null, icon('pin', 18)),
+    h('span', null, icon('headset', 18)), h('span', { class: 'on' }, icon('checks', 18)));
+
+  const layer = h('div', { class: 'cqa-layer' });
+  const modal = h('div'); const toasts = h('div', { class: 'cqa-toasts' }); const dock = h('div', { class: 'cqa-dock' });
+  layer.append(modal, toasts, dock);
+  setLayers({ modal, toasts, dock });
+
+  root.replaceChildren(h('div', { class: 'cqa-frame' }, d365Top, d365Rail, h('div', { class: 'cqa-app' }, ribbon, ui.view)), ui.tabbar, layer);
+
+  ui.pill.addEventListener('click', (e) => { e.stopPropagation(); openDatasetPopover(ui.right); });
+  ui.host.addEventListener('click', () => setHostPreview(!root.classList.contains('cqa-host-on')));
+  if (D365Bridge.ready) ui.host.hidden = true; // already inside Dynamics 365
+  else setHostPreview(readPref(HOST_KEY) === '1', false);
+}
+
+function setHostPreview(on, persist = true) {
+  ui.root.classList.toggle('cqa-host-on', on);
+  ui.host.classList.toggle('on', on);
+  ui.host.setAttribute('aria-pressed', String(on));
+  if (persist) writePref(HOST_KEY, on ? '1' : '0');
+  const ready = D365Bridge.ready;
+  ui.bridge.className = `bridge ${ready ? 'ok' : 'wait'}`;
+  ui.bridge.replaceChildren(h('i'), ready ? 'Xrm.WebApi Bridge: Ready' : 'Предпросмотр · Xrm не обнаружен');
+}
+
+function renderChrome() {
   const path = currentRoute();
-  const nav = clear(document.getElementById('nav'));
-  for (const item of NAV) {
-    const active = item.path === '/' ? path === '/' : path.startsWith(item.path) || (item.path === '/dialogs' && path.startsWith('/dialog/'));
+  ui.tabs.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
-    nav.append(h('a', { href: `#${item.path}`, class: active ? 'active' : '' },
-      icon(item.icon, 20), item.label, badge ? h('span', { class: 'badge' }, badge) : null));
-  }
-  const tabbar = clear(document.getElementById('tabbar'));
-  for (const item of NAV) {
-    const active = item.path === '/' ? path === '/' : path.startsWith(item.path) || (item.path === '/dialogs' && path.startsWith('/dialog/'));
+    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
+      icon(item.icon, 16), item.label, badge ? h('span', { class: 'badge' }, badge) : null);
+  }));
+  ui.tabbar.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
-    tabbar.append(h('a', { href: `#${item.path}`, class: active ? 'active' : '' },
-      h('span', { class: 'tab-icon' }, icon(item.icon, 22), badge ? h('span', { class: 'dot' }, badge) : null),
-      h('span', { class: 'tab-label' }, item.label)));
-  }
-  const pill = clear(document.getElementById('datasetPill'));
+    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
+      h('span', { class: 'tab-icon' }, icon(item.icon, 21), badge ? h('span', { class: 'dot' }, badge) : null),
+      h('span', { class: 'tab-label' }, item.short));
+  }));
   const ds = state.datasets.find((d) => d.groupId === state.group);
-  pill.append(
-    h('span', { class: 'ds-icon' }, icon('database', 18)),
-    h('span', { class: 'ds-text' }, h('small', null, 'Набор диалогов'), h('b', null, ds ? `${ds.groupId} · ${ds.total}` : 'Не загружен')),
-    icon('chevron', 16));
-  const chip = clear(document.getElementById('datasetChip'));
-  chip.append(icon('database', 15), ds ? `${ds.groupId} · ${ds.total}` : 'Набор', icon('chevron', 14));
-  document.body.classList.toggle('no-data', !state.group);
+  ui.pill.replaceChildren(icon('database', 14), 'Набор:', h('span', { class: 'mono' }, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
+  ui.root.classList.toggle('no-data', !state.group);
 }
 
 function route() {
@@ -69,39 +119,69 @@ function route() {
   if (cleanup) { try { cleanup(); } catch { /* noop */ } cleanup = null; }
   const samePage = path === currentPath;
   currentPath = path;
-  renderNav();
-  clear(view);
-  document.querySelector('.hero').style.display = '';
-  if (!state.group) {
-    document.querySelector('.hero').style.display = 'none';
-    cleanup = renderImportStage(view);
-    return;
-  }
+  setRibbonAction(null);
+  renderChrome();
+  clear(ui.view);
+  D365Bridge.post('route', { path });
+  if (!state.group) { cleanup = renderImportStage(ui.view) || null; return; }
   for (const [re, fn] of ROUTES) {
     const m = path.match(re);
     if (m) {
-      cleanup = fn(view, ...m.slice(1).map((x) => (x ? decodeURIComponent(x) : x))) || null;
-      if (!samePage) { main.scrollTop = 0; window.scrollTo(0, 0); }
+      cleanup = fn(ui.view, ...m.slice(1).map((x) => (x ? decodeURIComponent(x) : x))) || null;
+      if (!samePage) { scrollTop(); }
       return;
     }
   }
   location.hash = '#/';
 }
 
-document.getElementById('datasetPill').addEventListener('click', () => openDatasetModal());
-document.getElementById('datasetChip').addEventListener('click', () => openDatasetModal());
-window.addEventListener('hashchange', route);
-subscribe((what) => {
-  if (what === 'group') route();
-  else renderNav();
-});
+function scrollTop() {
+  window.scrollTo(0, 0);
+  const app = ui.root.querySelector('.cqa-app');
+  if (app) app.scrollTop = 0;
+}
 
-(async function start() {
+/**
+ * Mount the widget into any container.
+ * context: { apiBase?, groupId?, conversationId? } — values from Dynamics 365 (web resource "data")
+ * override nothing that the caller passes explicitly.
+ */
+export async function mount(container, context = {}) {
+  if (mounted) return;
+  mounted = true;
+  let root = container;
+  if (root.id !== 'cqa-d365-root') {
+    root = h('div', { id: 'cqa-d365-root' });
+    container.append(root);
+  }
+  const ctx = { ...D365Bridge.detect(), ...context };
+  if (ctx.apiBase) setApiBase(ctx.apiBase);
+  buildShell(root);
+
+  window.addEventListener('hashchange', route);
+  subscribe((what) => { if (what === 'group') route(); else renderChrome(); });
+  D365Bridge.listen({
+    openDialog: (cid) => { location.hash = `#/dialog/${encodeURIComponent(cid)}`; },
+    setGroup: (g) => loadGroup(g).catch((e) => toast(e.message, { type: 'error' })),
+  });
+
   try {
     await boot();
-  } catch (e) {
-    toast('Сервер недоступен. Запустите python server.py', { type: 'error', timeout: 10000 });
+    if (ctx.groupId && ctx.groupId !== state.group && state.datasets.some((d) => d.groupId === ctx.groupId)) await loadGroup(ctx.groupId, false);
+    if (ctx.conversationId && !location.hash) location.hash = `#/dialog/${encodeURIComponent(ctx.conversationId)}`;
+  } catch {
+    toast('Сервер CQA недоступен', { type: 'error', timeout: 10000 });
   }
   route();
   resumeJobs();
-})();
+  D365Bridge.post('ready', { groupId: state.group });
+}
+
+// Asset paths are relative to this module, so the widget works from any base URL.
+function assetUrl(p) { return new URL(`../${p}`, import.meta.url).href; }
+function readPref(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function writePref(k, v) { try { localStorage.setItem(k, v); } catch { /* storage blocked */ } }
+
+// Public namespace for Dynamics 365 engineers and the host page.
+window.FreedomCQA = { mount, version: '1.0' };
+window.CQA = { Config: { get apiBase() { return window.CQA_API_BASE || ''; } }, Store: state, Scoring, Api: api, D365Bridge };

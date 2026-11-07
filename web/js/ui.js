@@ -49,6 +49,13 @@ const P = {
   right: '<path d="m9 18 6-6-6-6"/>',
   search: '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
   download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+  waffle: '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>',
+  home: '<path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  clockR: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5h4"/>',
+  pin: '<path d="M12 17v5M9 3h6l-1 6 3 3v2H7v-2l3-3z"/>',
+  headset: '<path d="M4 14v-2a8 8 0 0 1 16 0v2M4 14h3v6H5a1 1 0 0 1-1-1zM20 14h-3v6h2a1 1 0 0 0 1-1z"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+  coins: '<circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6M9 6v6M7 8h3.5a1.5 1.5 0 0 1 0 3H7"/>',
   upload: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>',
   database: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v14c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 12c0 1.7 3.6 3 8 3s8-1.3 8-3"/>',
   sparkles: '<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9zM19 15l.9 2.1L22 18l-2.1.9L19 21l-.9-2.1L16 18l2.1-.9zM5 2l.6 1.4L7 4l-1.4.6L5 6l-.6-1.4L3 4l1.4-.6z"/>',
@@ -88,8 +95,14 @@ export const fmtDate = (iso) => {
 
 // ---------- toast ----------
 
+// Overlays (modals, toasts, the job dock) render inside the widget's own layer so that
+// nothing is appended to a host page such as a Dynamics 365 form.
+const layers = { modal: null, toasts: null, dock: null };
+export function setLayers(l) { Object.assign(layers, l); }
+export const layer = (name) => layers[name] || document.body;
+
 export function toast(message, { type = 'ok', action, timeout = 4200 } = {}) {
-  const root = document.getElementById('toasts');
+  const root = layer('toasts');
   const el = h('div', { class: `toast ${type}` },
     icon(type === 'error' ? 'alert' : 'check', 18),
     h('span', null, message),
@@ -101,7 +114,7 @@ export function toast(message, { type = 'ok', action, timeout = 4200 } = {}) {
 // ---------- modal ----------
 
 export function openModal({ title, sub, body, footer, wide = false, className = '', head }) {
-  const root = document.getElementById('modal-root');
+  const root = layer('modal');
   const overlay = h('div', { class: 'overlay' });
   const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
   const onKey = (e) => { if (e.key === 'Escape') close(); };

@@ -82,25 +82,57 @@ export function renderImportStage(root) {
   root.append(h('div', { class: 'import-stage' },
     h('div', { class: 'card import-card' },
       h('h2', null, 'Импорт диалогов'),
+      h('p', { class: 'muted' }, 'group_id набора из API организаторов: DEV — разработка, контрольный ключ выдают на 23-м часе.'),
       importCard())));
 }
 
-export function openDatasetModal() {
-  let modal;
-  const list = state.datasets.length
-    ? h('div', { class: 'ds-list' }, [...state.datasets].reverse().map((d) =>
-      h('button', {
-        class: `ds-item ${d.groupId === state.group ? 'on' : ''}`, type: 'button',
-        onclick: async () => { modal.close(); if (d.groupId !== state.group) await loadGroup(d.groupId); },
-      },
-      icon('database', 20),
-      h('div', null, h('b', null, d.groupId),
-        h('div', { class: 'meta' }, `${d.chats} ${pluralRu(d.chats, 'чат', 'чата', 'чатов')} · ${d.calls} ${pluralRu(d.calls, 'звонок', 'звонка', 'звонков')}`)),
-      d.groupId === state.group ? icon('check', 20) : null)))
-    : null;
+// Dataset switcher in the ribbon: loaded sets plus any group_id (e.g. the hour-23 control key).
+let openPopover = null;
+export function openDatasetPopover(anchor) {
+  if (openPopover) { openPopover.close(); return; }
+  const input = h('input', { class: 'input mono', placeholder: 'group_id, например DEV', spellcheck: 'false', autocomplete: 'off' });
+  const status = h('div', { class: 'pop-status' });
+  const go = h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Загрузить');
+  const list = state.datasets.length ? [...state.datasets].reverse().map((d) =>
+    h('button', {
+      class: `pop-item ${d.groupId === state.group ? 'on' : ''}`, type: 'button',
+      onclick: async () => { close(); if (d.groupId !== state.group) await loadGroup(d.groupId); },
+    },
+    icon('database', 16), h('b', { class: 'mono' }, d.groupId),
+    h('span', { class: 'meta' }, `${d.chats} ${pluralRu(d.chats, 'чат', 'чата', 'чатов')} · ${d.calls} ${pluralRu(d.calls, 'звонок', 'звонка', 'звонков')}`),
+    d.groupId === state.group ? icon('check', 16) : null)) : [h('div', { class: 'muted', style: { padding: '4px' } }, 'Наборов пока нет')];
 
-  modal = openModal({
-    title: 'Наборы диалогов',
-    body: [list, h('div', { class: 'field' }, h('label', null, 'Загрузить новый набор'), importCard({ initial: '', onOpen: () => modal.close() }))],
-  });
+  const form = h('form', {
+    onsubmit: async (e) => {
+      e.preventDefault();
+      const g = input.value.trim();
+      if (!g) { input.focus(); return; }
+      go.disabled = true;
+      status.replaceChildren(h('div', { class: 'bar indeterminate' }, h('i')));
+      try {
+        const meta = await api.importDataset(g);
+        await refreshDatasets();
+        close();
+        await loadGroup(meta.groupId);
+      } catch (err) {
+        status.replaceChildren(h('div', { class: 'import-error' }, err.message));
+      } finally { go.disabled = false; }
+    },
+  }, h('div', { class: 'pop-row' }, input, go), status);
+
+  const el = h('div', { class: 'cqa-popover', role: 'dialog', 'aria-label': 'Набор диалогов' },
+    h('div', { class: 'pop-title' }, 'Набор диалогов'), list,
+    h('div', { class: 'pop-sep' }),
+    h('div', { class: 'pop-title' }, 'Загрузить по group_id'), form);
+  el.addEventListener('click', (e) => e.stopPropagation());
+  anchor.append(el);
+  const onDoc = () => close();
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  setTimeout(() => { document.addEventListener('click', onDoc); document.addEventListener('keydown', onKey); }, 0);
+  function close() {
+    el.remove(); openPopover = null;
+    document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey);
+  }
+  openPopover = { close };
+  setTimeout(() => input.focus(), 30);
 }
