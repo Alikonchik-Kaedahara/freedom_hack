@@ -2,27 +2,29 @@
 // a selection bar for batch actions, statuses in words.
 import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, hashQuery, clearHashQuery, moreMenu } from '../ui.js';
 import { state, subscribe, summaryFor, resultFor } from '../store.js';
+import { currentReview, reviewCriteria, reviewLink, rememberReviewList } from '../review.js';
 import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { finalAnswers, score } from '../scoring.js';
 import { openExportModal } from './export.js';
 
-const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, q: '' };
+const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, review: false, reviewed: false, q: '' };
 const selected = new Set();
 const sort = { key: null, dir: 1 }; // key: 'score' | 'operator' | null (set order)
 const UNNAMED = new Set(['', 'Не представился', '[Имя скрыто]']);
 
-const anyFilter = () => filters.lang.size || filters.channel.size || filters.gross || filters.appeal || filters.disputed || filters.q.trim();
+const anyFilter = () => filters.lang.size || filters.channel.size || filters.gross || filters.appeal || filters.disputed || filters.review || filters.reviewed || filters.q.trim();
 function resetFilters() {
   filters.lang.clear(); filters.channel.clear();
-  filters.gross = false; filters.appeal = false; filters.disputed = false; filters.q = '';
+  filters.gross = false; filters.appeal = false; filters.disputed = false; filters.review = false; filters.reviewed = false; filters.q = '';
 }
 
 export function renderDialogs(root) {
   // Links from Home open the registry already filtered: #/dialogs?f=gross | disputed | appeal
   const preset = hashQuery().get('f');
-  if (['gross', 'disputed', 'appeal'].includes(preset)) {
+  if (['gross', 'disputed', 'appeal', 'review', 'reviewed'].includes(preset)) {
     resetFilters();
     filters[preset] = true;
+    if (preset === 'gross' || preset === 'disputed') filters.review = true;
     clearHashQuery();
   }
 
@@ -35,9 +37,14 @@ export function renderDialogs(root) {
       const s = summaryFor(r.conversation_id);
       if (filters.lang.size && !filters.lang.has(r.language)) return false;
       if (filters.channel.size && !filters.channel.has(r.channel)) return false;
-      if (filters.gross && !s?.gross) return false;
+      if (filters.gross && !(filters.review ? reviewCriteria(r.conversation_id, 'gross').length : s?.gross)) return false;
       if (filters.appeal && !s?.pending) return false;
-      if (filters.disputed && !s?.disputed?.length) return false;
+      if (filters.disputed && !(filters.review ? reviewCriteria(r.conversation_id, 'disputed').length : s?.disputed?.length)) return false;
+      if (filters.review && !reviewCriteria(r.conversation_id).length) return false;
+      if (filters.reviewed) {
+        const res = resultFor(r.conversation_id);
+        if (!res?.checklist.criteria.some((c) => currentReview(res, c.id)) || reviewCriteria(r.conversation_id).length) return false;
+      }
       if (filters.q && !matchOf(r)) return false;
       return true;
     });
@@ -106,6 +113,8 @@ export function renderDialogs(root) {
         chip('Чат', filters.channel.has('agent chat'), toggleSet(filters.channel, 'agent chat')),
         chip('Звонок', filters.channel.has('voice call'), toggleSet(filters.channel, 'voice call')),
         h('span', { class: 'chip-sep' }),
+        chip('На разбор', filters.review, () => { filters.review = !filters.review; filters.reviewed = false; }),
+        chip('Проверенные', filters.reviewed, () => { filters.reviewed = !filters.reviewed; filters.review = filters.disputed = filters.gross = false; }),
         chip('Грубая ошибка', filters.gross, () => (filters.gross = !filters.gross), true),
         chip('Апелляция', filters.appeal, () => (filters.appeal = !filters.appeal)),
         chip('Спорные', filters.disputed, () => (filters.disputed = !filters.disputed)))));
@@ -170,10 +179,10 @@ export function renderDialogs(root) {
     footHost.replaceChildren(h('div', { class: 'table-foot' },
       h('span', null, rows.length === state.records.length ? `${rows.length} ${pluralRu(rows.length, 'диалог', 'диалога', 'диалогов')}` : `Показано ${rows.length} из ${state.records.length}`),
       h('span', { class: 'mx-legend' },
-        h('span', null, h('i', { class: 'ok' }), 'выполнен'),
-        h('span', null, h('i', { class: 'part' }), 'частично'),
-        h('span', null, h('i', { class: 'fail' }), 'не выполнен'),
-        h('span', null, h('i', { class: 'na' }), 'не применим'))));
+        h('span', null, h('i', { class: 'ok', 'aria-hidden': 'true' }, '✓'), 'выполнен'),
+        h('span', null, h('i', { class: 'part', 'aria-hidden': 'true' }, '◐'), 'частично'),
+        h('span', null, h('i', { class: 'fail', 'aria-hidden': 'true' }, '×'), 'не выполнен'),
+        h('span', null, h('i', { class: 'na', 'aria-hidden': 'true' }, '–'), 'не применим'))));
   };
 
   const row = (r) => {
@@ -186,7 +195,15 @@ export function renderDialogs(root) {
     if (s?.gross) tags.push(h('span', { class: 'tag red' }, 'Грубая ошибка'));
     if (s?.pending) tags.push(h('span', { class: 'tag amber' }, 'Апелляция'));
     else if (s?.changed) tags.push(h('span', { class: 'tag green' }, 'Пересмотрен'));
-    if (s?.disputed?.length) tags.push(h('span', { class: 'tag amber', title: 'Критерии, где оценка неуверенна или второе мнение разошлось с первым' }, `Спорно: ${s.disputed.length}`));
+    const queue = filters.disputed ? 'disputed' : filters.gross ? 'gross' : filters.appeal ? 'appeal' : 'all';
+    const issues = reviewCriteria(cid, queue);
+    const res = resultFor(cid);
+    if (issues.length) {
+      const first = res.checklist.criteria.find((c) => c.id === issues[0]);
+      tags.push(h('span', { class: 'tag amber reason-tag' }, `Проверить: ${first.name}${issues.length > 1 ? ' · ещё ' + (issues.length - 1) : ''}`));
+    } else if (res?.checklist.criteria.some((c) => currentReview(res, c.id))) {
+      tags.push(h('span', { class: 'tag green' }, 'Проверено'));
+    }
     const cb = h('input', {
       type: 'checkbox', class: 'cb', checked: selected.has(cid), 'aria-label': `Выбрать ${cid}`,
       onclick: (e) => {
@@ -196,7 +213,10 @@ export function renderDialogs(root) {
         drawSelection();
       },
     });
-    const open = () => (location.hash = `#/dialog/${encodeURIComponent(cid)}`);
+    const open = () => {
+      rememberReviewList(visible().map((r) => r.conversation_id));
+      location.hash = reviewLink(cid, queue);
+    };
     const m = matchOf(r);
     const act = s
       ? h('button', { class: 'btn btn-secondary btn-xs', type: 'button', onclick: (e) => { e.stopPropagation(); open(); } }, 'Открыть')
@@ -234,6 +254,7 @@ const operatorOf = (cid) => {
 };
 
 // Eight squares, one per checklist criterion; the last one is the gross-error check.
+const MX_SYMBOL = { ok: '✓', clean: '✓', part: '◐', fail: '×', flag: '!', na: '–' };
 const MX_TITLE = { ok: 'выполнен', part: 'частично', fail: 'не выполнен', na: 'не применим', flag: 'грубая ошибка', clean: 'грубых ошибок нет' };
 function matrix(cid) {
   const res = resultFor(cid);
@@ -242,7 +263,8 @@ function matrix(cid) {
   const cells = res.checklist.criteria.map((c) => {
     const st = sc.per[c.id]?.status || 'na';
     const cls = st === 'flag' ? 'fail' : st === 'clean' ? 'ok' : st;
-    return h('i', { class: cls, title: `${c.code} ${c.name}: ${MX_TITLE[st] || st}` }, st === 'na' ? '–' : '');
+    const label = `${c.code} ${c.name}: ${MX_TITLE[st] || st}`;
+    return h('i', { class: cls, role: 'img', 'aria-label': label, title: label }, MX_SYMBOL[st]);
   });
   return h('span', { class: 'mx' }, cells);
 }

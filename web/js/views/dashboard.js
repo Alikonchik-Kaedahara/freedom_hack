@@ -4,6 +4,8 @@ import { state, subscribe, summaryFor, resultFor, allAppeals } from '../store.js
 import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 
+import { reviewCriteria, reviewLink, rememberReviewList } from '../review.js';
+
 const SVGNS = 'http://www.w3.org/2000/svg';
 
 export function renderDashboard(root) {
@@ -52,39 +54,41 @@ function build() {
           h('button', { class: 'btn btn-primary', onclick: () => startEvaluation(pendingIds) }, `Оценить все ${pendingIds.length}`))));
   }
 
-  return h('div', { class: 'page' }, head, queueCards(evaluated),
+  return h('div', { class: 'page dashboard-page' }, head, queueCards(evaluated),
     h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)));
 }
 
-const LOW = 65; // an operator average below this needs attention
+const LOW = 65; // Individual dialog scores below this threshold need attention.
 const UNNAMED = new Set(['Не представился', '[Имя скрыто]', '']);
 const isToday = (iso) => { if (!iso) return false; const d = new Date(iso); const n = new Date(); return d.toDateString() === n.toDateString(); };
 
 /** «Что мне сделать сегодня»: three work queues, each opening an already filtered list. */
 function queueCards(evaluated) {
-  const gross = evaluated.filter((r) => summaryFor(r.conversation_id).gross).length;
-  const disputed = evaluated.filter((r) => summaryFor(r.conversation_id).disputed?.length).length;
+  const gross = evaluated.filter((r) => reviewCriteria(r.conversation_id, 'gross').length).length;
+  const disputed = evaluated.filter((r) => reviewCriteria(r.conversation_id, 'disputed').length).length;
   const appeals = allAppeals();
   const waiting = appeals.filter((x) => x.appeal.status === 'pending').length;
   const decidedToday = appeals.filter((x) => x.appeal.status !== 'pending' && isToday(x.appeal.decision?.decidedAt)).length;
   const ops = operatorStats(evaluated);
 
   const line = (n, text, href) => h('a', { class: `q-line ${n ? '' : 'zero'}`, href }, h('b', null, n), ` ${text}`);
-  const card = (title, lines, btn) => h('div', { class: 'card q-card' }, h('h3', { class: 'card-title' }, title), h('div', { class: 'q-lines' }, lines), h('div', { class: 'q-foot' }, btn));
+  const card = (title, lines, btn, cls = '') => h('div', { class: `card q-card ${cls}` }, h('h3', { class: 'card-title' }, title), h('div', { class: 'q-lines' }, lines), h('div', { class: 'q-foot' }, btn));
   return h('div', { class: 'queue-cards' },
     card('Требуют разбора', [
       line(gross, pluralRu(gross, 'грубая ошибка', 'грубые ошибки', 'грубых ошибок'), '#/dialogs?f=gross'),
       line(disputed, pluralRu(disputed, 'спорная оценка', 'спорные оценки', 'спорных оценок'), '#/dialogs?f=disputed'),
-    ], gross || disputed
-      ? h('a', { class: 'btn btn-secondary btn-sm', href: gross ? '#/dialogs?f=gross' : '#/dialogs?f=disputed' }, 'Открыть список')
+    ], gross || disputed || waiting
+      ? h('a', { class: 'btn btn-secondary btn-sm', href: '#/dialogs?f=review' }, 'Открыть очередь')
       : h('span', { class: 'muted' }, 'Всё разобрано')),
     card('Апелляции', [
       line(waiting, waiting === 1 ? 'ждёт решения' : 'ждут решения', '#/appeals'),
       line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals'),
-    ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : 'Открыть апелляции')),
+    ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : decidedToday ? 'Открыть апелляции' : 'Нет открытых'), waiting || decidedToday ? 'appeals-card' : 'appeals-card quiet'),
     card('Операторы', ops.total ? [
-      line(ops.below, `из ${ops.total} ${ops.below === 1 ? 'требует' : 'требуют'} внимания`, '#/operators'),
-      ops.weakest ? h('div', { class: 'q-line plain' }, 'самый низкий балл: ', h('b', null, ops.weakest.name), ` · ${fmtScore(ops.weakest.avg)}`) : null,
+      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ' с двумя и более оценками ниже 65'),
+      h('div', { class: 'q-line plain' }, `Один низкий результат: ${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')}`),
+      ops.weakest ? h('a', { class: 'q-line plain', href: `#/operators/${encodeURIComponent(ops.weakest.name)}` },
+        `Минимум: ${ops.weakest.name} · ${fmtScore(ops.weakest.avg)} · ${ops.weakest.n} ${pluralRu(ops.weakest.n, 'диалог', 'диалога', 'диалогов')}`) : null,
     ] : [h('div', { class: 'q-line plain' }, 'Имена операторов появятся после оценки')],
     h('a', { class: 'btn btn-secondary btn-sm', href: '#/operators' }, 'К операторам')));
 }
@@ -96,17 +100,19 @@ function operatorStats(evaluated) {
     const name = (resultFor(r.conversation_id)?.operator || '').trim();
     const total = summaryFor(r.conversation_id)?.total;
     if (UNNAMED.has(name) || total == null) continue;
-    const p = per.get(name) || { sum: 0, n: 0 };
+    const p = per.get(name) || { sum: 0, n: 0, low: 0 };
     p.sum += total; p.n += 1;
+    if (total < LOW) p.low += 1;
     per.set(name, p);
   }
-  let weakest = null, below = 0;
+  let weakest = null, single = 0, repeat = 0;
   for (const [name, p] of per) {
     const avg = p.sum / p.n;
-    if (avg < LOW) below += 1;
-    if (!weakest || avg < weakest.avg) weakest = { name, avg: round2(avg) };
+    if (p.low === 1) single += 1;
+    if (p.low >= 2) repeat += 1;
+    if (!weakest || avg < weakest.avg) weakest = { name, avg, n: p.n };
   }
-  return { total: per.size, below, weakest };
+  return { total: per.size, single, repeat, weakest };
 }
 
 function criteriaCard(evaluated) {
@@ -165,23 +171,23 @@ function segments(evaluated) {
 }
 
 function triageCard(evaluated) {
-  // Gross errors first, then pending appeals, disputed criteria, lowest totals.
-  const items = evaluated.map((r) => {
-    const s = summaryFor(r.conversation_id);
-    const res = resultFor(r.conversation_id);
-    const fa = finalAnswers(res);
-    const flagCrit = res.checklist.criteria.find((c) => c.type === 'flag' && fa[c.id]?.answer === 'yes');
-    const disputed = (s.disputed || []).map((id) => res.checklist.criteria.find((c) => c.id === id)).filter(Boolean);
-    const kind = s.gross ? 'gross' : s.pending ? 'appeal' : disputed.length ? 'disputed' : 'low';
-    const why = kind === 'gross' ? `Грубая ошибка: ${fa[flagCrit.id]?.explanation || 'см. карточку'}`
-      : kind === 'appeal' ? 'Апелляция ждёт решения'
-        : kind === 'disputed' ? `Спорная оценка: ${disputed.map((c) => c.code || c.name).join(', ')}` : 'Низкий итоговый балл';
-    return { r, s, res, why, rank: { gross: 0, appeal: 1, disputed: 2, low: 3 }[kind] * 1000 + (s.total ?? 0) };
-  }).sort((a, b) => a.rank - b.rank).slice(0, 8);
-
-  return h('div', { class: 'card card-pad' },
+  const items = evaluated.flatMap((r) => {
+    const cid = r.conversation_id;
+    const id = reviewCriteria(cid)[0];
+    if (!id) return [];
+    const s = summaryFor(cid), res = resultFor(cid);
+    const c = res.checklist.criteria.find((criterion) => criterion.id === id);
+    const isGross = s.final.grossIds.includes(id);
+    const pending = (res.appeals || []).some((a) => a.status === 'pending' && a.criterionId === id);
+    const why = isGross ? `Грубая ошибка · ${finalAnswers(res)[id]?.explanation || c.name}`
+      : pending ? `Апелляция · ${c.name}` : `Проверить: ${c.name}`;
+    const rank = (isGross ? 0 : pending ? 1 : 2) * 1000 + (s.total ?? 0);
+    return [{ r, s, res, why, rank }];
+  }).sort((a, b) => a.rank - b.rank);
+  return h('div', { class: 'card card-pad triage-card' },
     h('h3', { class: 'card-title' }, 'Очередь на разбор'),
-    h('div', { class: 'tri-list' }, items.map(({ r, s, res, why }) => {
+    !items.length ? h('p', { class: 'muted' }, 'Нет диалогов, ожидающих разбора.') : null,
+    h('div', { class: 'tri-list' }, items.slice(0, 8).map(({ r, s, res, why }) => {
       const op = (res?.operator || '').trim();
       return h('div', { class: 'tri-row' },
         h('div', { class: 'main' },
@@ -190,6 +196,8 @@ function triageCard(evaluated) {
             h('span', { class: 'sep' }, '·'), h('span', { class: 'meta' }, r.language)),
           h('div', { class: 'why', title: why }, why)),
         h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total)),
-        h('a', { class: 'btn btn-secondary btn-xs', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Открыть'));
-    })));
+        h('a', { class: 'btn btn-secondary btn-xs', href: reviewLink(r.conversation_id), onclick: () => rememberReviewList(items.map(({ r }) => r.conversation_id)) }, 'Разобрать'));
+    })), items.length > 3 ? h('a', {
+      class: `link-btn ${items.length <= 8 ? 'mobile-queue-link' : ''}`, href: '#/dialogs?f=review',
+    }, `Все диалоги на разбор · ${items.length}`) : null);
 }

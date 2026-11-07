@@ -109,6 +109,7 @@ export function renderOperators(root, name) {
       const weakest = p.weakest.slice(0, 2).map((c) => h('span', { class: 'tag amber', title: `${c.name}: не выполнено ${c.failed}, частично ${c.partial} из ${c.applicable}` }, `${c.code} · ${pct(c.failRate)}`));
       return h('tr', { class: `op-row ${unnamed ? 'unnamed' : ''}`, onclick: open },
         h('td', null, h('div', { class: 'op-name' }, h('span', { class: `op-avatar ${unnamed ? 'unknown' : ''}` }, initials(p.name)), h('b', null, p.name)),
+          h('span', { class: 'op-mobile-count' }, `${p.count} ${pluralRu(p.count, 'диалог', 'диалога', 'диалогов')}`),
           unnamed ? h('div', { class: 'muted small' }, 'Имя можно указать в карточке диалога: «⋯» → «Указать оператора»') : null),
         h('td', { class: 'num' }, p.count),
         h('td', { class: 'num' }, h('span', { class: `score ${scoreClass(p.average)}` }, fmtScore(p.average))),

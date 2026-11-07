@@ -1,8 +1,9 @@
 // Screens 4–7: dialog card — transcript, call player, criteria inspector,
 // evidence jumps, gross error banner and appeal submission.
-import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate, moreMenu } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate, moreMenu, hashQuery } from '../ui.js';
 import { api } from '../api.js';
-import { state, subscribe, resultFor, summaryFor, putResult, keyOf } from '../store.js';
+import { state, subscribe, resultFor, summaryFor, putResult, keyOf, refreshResults } from '../store.js';
+import { currentReview, reviewCriteria, nextReviewLink, reviewVersion } from '../review.js';
 import { finalAnswers, score, verdictOf, round2, disputeLabel, evidenceOf, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
@@ -30,8 +31,14 @@ export function renderDialog(root, cid) {
   if (!rec) { location.hash = '#/dialogs'; return null; }
   const isCall = rec.channel === 'voice call';
   const times = displayTimes(rec.transcript);
-  if (!openSets.has(cid)) openSets.set(cid, new Set());
-  const open = openSets.get(cid);
+  const key = keyOf(cid);
+  if (!openSets.has(key)) openSets.set(key, new Set());
+  const open = openSets.get(key);
+  const query = hashQuery();
+  const queue = query.get('queue') || 'all';
+  const requested = query.get('criterion');
+  let returnCriterion = null;
+  let scoreScroll = 0;
 
   // ----- transcript -----
   const msgEls = rec.transcript.map((m, i) => {
@@ -78,8 +85,35 @@ export function renderDialog(root, cid) {
 
   // Phones: one panel at a time, switched by tabs. Evidence jumps open the chat.
   function setTab(tab) {
+    if (page.dataset.tab === 'score' && tab === 'chat') scoreScroll = window.scrollY;
     page.dataset.tab = tab;
-    for (const b of tabsEl.querySelectorAll('button')) b.classList.toggle('on', b.dataset.tab === tab);
+    for (const b of tabsEl.querySelectorAll('button')) {
+      b.classList.toggle('on', b.dataset.tab === tab);
+      b.setAttribute('aria-pressed', String(b.dataset.tab === tab));
+    }
+  }
+
+  function focusCriterion(id, moveFocus = false) {
+    const button = inspector.querySelector(`[data-criterion="${CSS.escape(id)}"]`);
+    if (!button) return;
+    if (isMobile()) button.scrollIntoView({ block: 'start' });
+    else inspector.scrollTop += button.getBoundingClientRect().top - inspector.getBoundingClientRect().top - 12;
+    if (moveFocus) button.focus({ preventScroll: true });
+  }
+
+  function backToScore() {
+    setTab('score');
+    if (returnCriterion) focusCriterion(returnCriterion, true);
+    else window.scrollTo({ top: scoreScroll });
+    returnCriterion = null;
+    updateTabLabel();
+  }
+
+  function updateTabLabel() {
+    const c = resultFor(cid)?.checklist.criteria.find((c) => c.id === returnCriterion);
+    const s = summaryFor(cid);
+    scoreTabLabel.textContent = c && page.dataset.tab === 'chat' ? `К критерию ${c.code}`
+      : s ? `Оценка · ${fmtScore(s.total)}` : 'Оценка';
   }
 
   let activeHl = null;
@@ -88,12 +122,14 @@ export function renderDialog(root, cid) {
     activeHl = ids.length ? { ids, cls } : null;
     for (const i of ids) msgEls[i]?.classList.add(cls);
   }
-  function jump(ids, status, focus, fromUser = false) {
+  function jump(ids, status, focus, fromUser = false, criterionId = null) {
     highlight(ids, HL_CLASS[status] || 'hl-gray');
     const target = focus ?? ids[0];
     if (target != null) {
       if (fromUser && isMobile()) {
+        returnCriterion = criterionId;
         setTab('chat');
+        updateTabLabel();
         setTimeout(() => scrollToMsg(target), 60);
       } else {
         scrollToMsg(target);
@@ -109,7 +145,7 @@ export function renderDialog(root, cid) {
   const scoreTabLabel = h('span');
   const tabsEl = h('div', { class: 'm-tabs' },
     h('div', { class: 'segmented' },
-      h('button', { type: 'button', 'data-tab': 'score', onclick: () => { setTab('score'); window.scrollTo({ top: 0 }); } }, icon('checks', 16), scoreTabLabel),
+      h('button', { type: 'button', 'data-tab': 'score', onclick: backToScore }, icon('checks', 16), scoreTabLabel),
       h('button', { type: 'button', 'data-tab': 'chat', onclick: () => setTab('chat') }, icon(isCall ? 'phone' : 'chat', 16), isCall ? 'Звонок' : 'Переписка')));
   const page = h('div', { class: 'page fill' },
     headHost, bannerHost, tabsEl,
@@ -126,6 +162,8 @@ export function renderDialog(root, cid) {
     const op = (res?.operator || '').trim();
     const sub = [channelLabel(rec.channel), rec.language, op ? `Оператор ${op}` : null].filter(Boolean).join(' · ');
     const menu = res ? moreMenu([
+      res.reviewLog?.length && { label: 'История проверок', onClick: () => showHistory(res) },
+      !running && { label: 'Переоценить', onClick: () => startEvaluation([cid]) },
       { label: res.secondOpinion ? 'Второе мнение ещё раз' : 'Второе мнение', onClick: () => confirmSecondOpinion([cid]) },
       { label: 'Скачать отчёт', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank' },
       { label: 'Указать оператора', onClick: () => renameOperator(res) },
@@ -137,8 +175,16 @@ export function renderDialog(root, cid) {
           h('h1', null, h('span', { class: 'h1-word' }, 'Диалог '), h('span', { class: 'mono-id' }, cid)),
           h('div', { class: 'sub' }, sub, s ? [' · ', h('b', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total))] : null))),
       h('div', { class: 'head-actions' },
-        h('button', { class: 'btn btn-primary', type: 'button', disabled: running, onclick: () => startEvaluation([cid]) }, res ? 'Переоценить' : 'Оценить'),
+        !res && h('button', { class: 'btn btn-primary', type: 'button', disabled: running, onclick: () => startEvaluation([cid]) }, 'Оценить'),
         menu)));
+  }
+
+  function showHistory(res) {
+    openModal({ title: 'История проверок', sub: cid, body: (res.reviewLog || []).slice().reverse().map((entry) =>
+      h('div', { class: 'review-entry' },
+        h('b', null, [entry.code, entry.name || entry.criterionId].filter(Boolean).join(' · ')),
+        h('div', null, entry.source === 'appeal' ? 'Решение по апелляции' : 'Оценка подтверждена'),
+        h('small', null, [entry.by, fmtDate(entry.at)].filter(Boolean).join(' · ')))) });
   }
 
   /** «Указать оператора»: fix the name taken from the first reply; an empty field returns to automatic detection. */
@@ -205,7 +251,7 @@ export function renderDialog(root, cid) {
     for (const i of ev) msgEls[i]?.classList.add('gross');
     bannerHost.replaceChildren(h('div', { class: 'gross-banner', role: 'alert' },
       h('div', { class: 'gb-text' }, h('b', null, 'Грубая ошибка'), ' — ', fa[crit.id]?.explanation || crit.name),
-      ev.length ? h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true); } }, 'Показать в диалоге') : null));
+      ev.length ? h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true, crit.id); } }, 'Показать в диалоге') : null));
   }
 
   function drawInspector() {
@@ -228,7 +274,7 @@ export function renderDialog(root, cid) {
     const fa = finalAnswers(res);
     const sc = score(res.checklist, fa);
     const orig = score(res.checklist, res.answers);
-    scoreTabLabel.textContent = `Оценка · ${fmtScore(sc.total)}`;
+    updateTabLabel();
 
     const sections = Object.entries(sc.sections);
     // Technical details (checklist version, engine, cost, prompt hash) only on hover over ⓘ.
@@ -267,6 +313,7 @@ export function renderDialog(root, cid) {
     const toggle = () => {
       if (open.has(c.id)) { open.delete(c.id); highlight([], ''); } else { open.add(c.id); if (ev.length) jump(ev, status); }
       drawInspector();
+      inspector.querySelector(`[data-criterion="${CSS.escape(c.id)}"]`)?.focus({ preventScroll: true });
     };
 
     const verdict = c.type === 'scale' && ans?.answer !== 'na'
@@ -275,11 +322,13 @@ export function renderDialog(root, cid) {
 
     const evLabel = status === 'fail' ? 'Проверенный участок' : status === 'na' ? 'Основание' : status === 'clean' ? 'Проверенные реплики' : 'Доказательство';
     const dispute = disputeLabel(ans);
+    const reviewed = currentReview(res, c.id);
+    const outstanding = reviewCriteria(cid).includes(c.id);
     const body = isOpen ? h('div', { class: 'crit-body' },
       ans?.explanation ? h('div', { class: 'expl' }, ans.explanation) : null,
       dispute ? h('div', { class: `dispute ${dispute.cls}` },
         icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
-      ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность оценки: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
+      ans?.confidence && !dispute ? h('div', { class: 'conf-line' }, `Уверенность оценки: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
       secondOpinionNote(res, c),
       knowledgeNote(ans),
       interpretationOf(res, c) ? h('details', { class: 'interp' },
@@ -288,21 +337,61 @@ export function renderDialog(root, cid) {
       ev.length ? h('div', null,
         h('div', { class: 'ev-label' }, evLabel),
         h('div', { class: 'ev-list' }, ev.map((i) =>
-          h('button', { class: `ev ${EV_CLASS[status] || ''}`, type: 'button', onclick: (e) => { e.stopPropagation(); jump(ev, status, i, true); } },
+          h('button', { class: `ev ${EV_CLASS[status] || ''}`, type: 'button', onclick: (e) => { e.stopPropagation(); jump(ev, status, i, true, c.id); } },
             icon('clock', 14), times[i] || `#${i}`)))) : null,
+      outstanding && ev.length && msgEls[ev[0]] ? h('blockquote', { class: 'review-quote' }, rec.transcript[ev[0]].text) : null,
       appeals.map((a) => appealBox(res, c, a, origAns)),
+      reviewActions(res, c, reviewed, outstanding, pending, ans),
       h('div', { class: 'crit-foot' },
         h('span', null, pointsText(c, p, sc)),
         !pending ? h('button', { class: 'link-btn', type: 'button', onclick: (e) => { e.stopPropagation(); openAppeal(res, c); } }, 'Подать апелляцию') : null)) : null;
 
     return h('div', { class: `crit ${isOpen ? 'open' : ''} ${status === 'flag' ? 'is-flag' : ''}` },
-      h('div', { class: 'crit-head', onclick: toggle },
+      h('button', { type: 'button', class: 'crit-head', 'data-criterion': c.id, 'aria-expanded': String(isOpen), onclick: toggle },
         h('span', { class: `st ${status}` }, icon(stIcon, 16, 2.6)),
-        h('div', { class: 'nm' }, h('small', null, c.code), c.name),
-        h('div', { class: 'vd' }, pending ? h('span', { class: 'tag amber', title: 'Апелляция' }, icon('scale', 13)) : null,
-          dispute && !ans?.overridden ? h('span', { class: `tag ${dispute.cls}`, title: dispute.text }, icon('alert', 13), h('span', { class: 'tag-text' }, dispute.text)) : null,
+        h('span', { class: 'nm' }, h('small', null, c.code), c.name),
+        h('span', { class: 'vd' }, pending ? h('span', { class: 'tag amber', title: 'Апелляция' }, icon('scale', 13)) : null,
+          reviewed && !pending ? h('span', { class: 'tag green' }, 'Проверено') : null,
+          !reviewed && dispute && !ans?.overridden ? h('span', { class: `tag ${dispute.cls}`, title: dispute.text }, icon('alert', 13), h('span', { class: 'tag-text' }, dispute.text)) : null,
           ans?.overridden ? h('span', { class: 'tag green' }, 'изменено') : null, verdict)),
       body);
+  }
+
+  function reviewActions(res, c, reviewed, outstanding, pending, ans) {
+    const log = (res.reviewLog || []).filter((e) => e.criterionId === c.id);
+    const previous = log.filter((e) => e.version !== reviewVersion(res));
+    const next = reviewed && !pending ? nextReviewLink(cid, queue) : null;
+    return h('div', { class: 'review-actions' },
+      reviewed && h('div', { class: 'review-stamp' }, icon('check', 14), 'Проверено · ', byLine(reviewed.by, reviewed.at)),
+      previous.length > 0 && h('details', null, h('summary', null, 'Предыдущие проверки'),
+        previous.slice().reverse().map((e) => h('div', null, byLine(e.by, e.at)))),
+      outstanding && !pending && ans?.answer != null && h('button', {
+        class: 'btn btn-primary', type: 'button', onclick: (e) => confirm(res, c, e.currentTarget),
+      }, 'Подтвердить оценку'),
+      reviewed && !pending && (next
+        ? h('a', { class: 'btn btn-secondary review-next', href: next },
+          reviewCriteria(cid, queue).length ? 'Следующий критерий' : queue === 'disputed' ? 'Следующий спорный диалог' : 'Следующий диалог')
+        : h('a', { class: 'link-btn review-next', href: '#/dialogs?f=review' }, 'К очереди разбора')));
+  }
+
+  async function confirm(res, c, button) {
+    button.disabled = true;
+    try {
+      const user = await requireUser('Имя и время сохранятся в истории проверки критерия.');
+      if (!user || !page.isConnected) return;
+      const updated = await api.confirmReview(res.key, { criterionId: c.id, by: user.name, version: reviewVersion(res) });
+      if (state.group !== updated.groupId) return;
+      putResult(updated);
+      toast('Проверка сохранена');
+      inspector.querySelector(`[data-criterion="${CSS.escape(c.id)}"]`)?.parentElement.querySelector('.review-next')?.focus({ preventScroll: true });
+    } catch (e) {
+      toast(e.message, { type: 'error' });
+      if (e.status === 409 && page.isConnected) {
+        try { await refreshResults(); } catch (refreshError) { toast(refreshError.message, { type: 'error' }); }
+      }
+    } finally {
+      button.disabled = false;
+    }
   }
 
   function provenanceText(res) {
@@ -372,14 +461,20 @@ export function renderDialog(root, cid) {
   }
 
   function drawAll() { drawHead(); drawBanner(); drawInspector(); }
+  const initial = resultFor(cid);
+  const entryId = initial?.checklist.criteria.some((c) => c.id === requested) ? requested : reviewCriteria(cid)[0];
+  if (entryId) open.add(entryId);
   drawAll();
-
-  // If the dialog has a gross error, open that criterion and point to it.
-  const res0 = resultFor(cid);
-  if (res0 && summaryFor(cid)?.gross && !open.size) {
-    const fa = finalAnswers(res0);
-    const crit = res0.checklist.criteria.find((c) => c.type === 'flag' && fa[c.id]?.answer === 'yes');
-    if (crit) { open.add(crit.id); drawInspector(); setTimeout(() => (fa[crit.id].evidence || []).length && scrollToMsg(fa[crit.id].evidence[0]), 200); }
+  if (entryId) {
+    requestAnimationFrame(() => {
+      if (!page.isConnected) return;
+      focusCriterion(entryId);
+      const crit = initial.checklist.criteria.find((c) => c.id === entryId);
+      const ev = evidenceOf(finalAnswers(initial)[entryId], crit, rec);
+      const status = summaryFor(cid).final.per[entryId]?.status;
+      highlight(ev, HL_CLASS[status] || 'hl-gray');
+      if (!isMobile() && ev.length) scrollToMsg(ev[0]);
+    });
   }
 
   const off = subscribe((w) => { if (w === 'results' || w === 'job') drawAll(); });

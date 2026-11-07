@@ -294,6 +294,48 @@ def _person(value):
     return name or None
 
 
+def _review_version(result):
+    return result.get("reviewVersion") or result.get("createdAt") or "legacy"
+
+
+def _record_review(result, criterion_id, by, at, source):
+    criterion = next(c for c in result["checklist"]["criteria"] if c["id"] == criterion_id)
+    result.setdefault("reviewLog", []).append({
+        "criterionId": criterion_id, "name": criterion["name"], "code": criterion.get("code"),
+        "by": by, "at": at, "source": source,
+        "version": _review_version(result),
+    })
+
+
+@app.post("/api/results/<path:key>/confirm")
+def confirm_review(key):
+    body = body_json() or {}
+    criterion_id = body.get("criterionId")
+    by = _person(body.get("by"))
+    if not isinstance(criterion_id, str) or not by or not isinstance(body.get("version"), str):
+        return bad("Укажите критерий, проверяющего и версию оценки")
+
+    def confirm(result):
+        if body["version"] != _review_version(result):
+            raise ValueError("Оценка обновилась. Проверьте новый результат.")
+        if not any(c["id"] == criterion_id for c in result["checklist"]["criteria"]):
+            raise ValueError("Такого критерия нет в этой оценке.")
+        if any(a["criterionId"] == criterion_id and a["status"] == "pending" for a in result.get("appeals", [])):
+            raise ValueError("По этому критерию открыта апелляция. Сначала рассмотрите её.")
+        if scoring.final_answers(result).get(criterion_id, {}).get("answer") is None:
+            raise ValueError("Нет оценки для подтверждения. Укажите решение через апелляцию.")
+        if not any(e["criterionId"] == criterion_id and e["version"] == body["version"]
+                   for e in result.get("reviewLog", [])):
+            _record_review(result, criterion_id, by, now(), "confirm")
+        return result
+
+    try:
+        result = storage.update_result(key, confirm)
+    except ValueError as exc:
+        return bad(str(exc), 409)
+    return jsonify(result) if result else bad("Оценка не найдена", 404)
+
+
 @app.post("/api/results/<path:key>/appeals")
 def create_appeal(key):
     body = body_json()
@@ -358,6 +400,7 @@ def decide_appeal(key, appeal_id):
                 raise ValueError("Недопустимое значение оценки для этого критерия")
         appeal["status"] = status
         appeal["decision"] = {"reason": reason, "decidedAt": now(), "answer": answer, "by": _person(body.get("by"))}
+        _record_review(result, appeal["criterionId"], appeal["decision"]["by"], appeal["decision"]["decidedAt"], "appeal")
         return _with_score(result)
 
     try:
@@ -492,7 +535,10 @@ def _run_second(job_id, group_id, cid, engine_override):
         answers, usage, engine, meta = evaluate(record, current["checklist"], settings)
 
         def attach(result):
+            if _review_version(current) != _review_version(result):
+                raise EvaluationError("Оценка обновилась. Запросите второе мнение заново.")
             second.attach(result, answers, usage, engine, meta, now())
+            result["reviewVersion"] = uuid.uuid4().hex
             return _with_score(result)
 
         updated = storage.update_result(key, attach)

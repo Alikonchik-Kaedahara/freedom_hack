@@ -331,6 +331,10 @@ def evaluated_sample(client):
 def test_second_opinion_endpoint(client, monkeypatch):
     fake_cloud(monkeypatch)
     ids = evaluated_sample(client)
+    path = "/api/results/SAMPLE:sample-ru-001"
+    version = client.get(path).get_json()["reviewVersion"]
+    confirmation = {"criterionId": "c7", "by": "Проверяющий", "version": version}
+    log = client.post(path + "/confirm", json=confirmation).get_json()["reviewLog"]
     fake_cloud(monkeypatch, flip="c7")
     r = client.post("/api/second-opinion", json={"groupId": "SAMPLE", "conversationIds": ["sample-ru-001", "sample-xx"]})
     assert r.status_code == 400 and "sample-xx" in r.get_json()["error"]
@@ -339,6 +343,8 @@ def test_second_opinion_endpoint(client, monkeypatch):
     job = wait_job(client, r.get_json()["id"])
     assert job["done"] == 1 and job["failed"] == 0
     res = client.get("/api/results/SAMPLE:sample-ru-001").get_json()
+    assert res["reviewLog"] == log and res["reviewVersion"] != version
+    assert client.post(path + "/confirm", json=confirmation).status_code == 409
     assert res["secondOpinion"]["comparison"]["disagree"] == ["c7"]
     assert res["score"]["disputed"] == ["c7"] and res["score"]["total"] == 100.0, "the original score stands"
     assert res["score"]["secondOpinion"]["rate"] == 0.88

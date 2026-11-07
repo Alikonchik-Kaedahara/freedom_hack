@@ -16,6 +16,7 @@ export const state = {
 };
 
 const listeners = new Set();
+let resultsRequest = 0;
 export function subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); }
 export function emit(what) { for (const fn of listeners) fn(what); }
 
@@ -27,6 +28,7 @@ export async function boot() {
 }
 
 export async function loadGroup(groupId, persist = true) {
+  resultsRequest++;
   const [records, results] = await Promise.all([api.dataset(groupId), api.results(groupId)]);
   state.group = groupId;
   state.records = records;
@@ -45,7 +47,12 @@ export async function refreshDatasets() {
 
 export async function refreshResults() {
   if (!state.group) return;
-  setResults(await api.results(state.group));
+  const group = state.group;
+  const request = ++resultsRequest;
+  const results = await api.results(group);
+  if (group !== state.group || request !== resultsRequest) return;
+  if (JSON.stringify(results) === JSON.stringify(state.results)) return;
+  setResults(results);
   emit('results');
 }
 
@@ -56,6 +63,7 @@ function setResults(results) {
 }
 
 export function putResult(result) {
+  resultsRequest++;
   // single-result responses carry no operator name; keep the one the list gave us
   if (result.operator == null && state.results[result.key]?.operator != null) result.operator = state.results[result.key].operator;
   state.results[result.key] = result;

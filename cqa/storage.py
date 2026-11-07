@@ -3,6 +3,7 @@ import copy
 import json
 import os
 import threading
+import uuid
 
 from .defaults import DEFAULT_CHECKLISTS, DEFAULT_SETTINGS, INTERPRETATIONS
 
@@ -169,7 +170,9 @@ def put_result(result):
         history = []
         if prev:
             history = prev.pop("history", [])
+            result["reviewLog"] = prev.pop("reviewLog", [])
             history.append(prev)
+        result["reviewVersion"] = uuid.uuid4().hex
         result["history"] = history[-5:]
         data[result["key"]] = result
         _write("results", data)

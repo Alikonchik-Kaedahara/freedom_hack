@@ -207,3 +207,51 @@ def test_snapshot_and_restore(client, fresh_storage, monkeypatch, tmp_path):
     server.prepare_demo()
     assert storage.get_settings()["engine"] == "replay"
     assert storage.list_datasets()[0]["groupId"] == "SAMPLE"
+
+
+def test_review_confirmation_is_shared_idempotent_and_versioned(client):
+    ids = import_sample(client)
+    evaluate_all(client, ids)
+    key = "SAMPLE:sample-ru-002"
+    path = f"/api/results/{key}"
+    original = client.get(path).get_json()
+    version = original["reviewVersion"]
+    body = {"criterionId": "c5", "by": " Демо   Проверяющий ", "version": version}
+    assert client.post(path + "/confirm", json={**body, "by": ""}).status_code == 400
+    assert client.post(path + "/confirm", json={**body, "criterionId": "unknown"}).status_code == 409
+    for by in [body["by"], "Другой проверяющий"]:
+        response = client.post(path + "/confirm", json={**body, "by": by})
+        assert response.status_code == 200
+        log = response.get_json()["reviewLog"]
+        assert len(log) == 1 and log[0]["by"] == "Демо Проверяющий" and log[0]["at"]
+
+    stored = client.get("/api/results?group=SAMPLE").get_json()[key]
+    assert stored["reviewLog"] == log and stored["answers"] == original["answers"]
+    assert stored["score"] == original["score"]
+    evaluate_all(client, ["sample-ru-002"])
+    updated = client.get(path).get_json()
+    assert updated["reviewVersion"] != version and updated["reviewLog"] == log
+    assert client.post(path + "/confirm", json=body).status_code == 409
+    fresh = client.post(path + "/confirm", json={**body, "version": updated["reviewVersion"]})
+    assert len(fresh.get_json()["reviewLog"]) == 2
+
+
+def test_review_respects_pending_appeals_and_preexisting_results(client, fresh_storage):
+    ids = import_sample(client)
+    evaluate_all(client, ids)
+    key = "SAMPLE:sample-ru-002"
+    path = f"/api/results/{key}"
+    def to_legacy(result):
+        result.pop("reviewVersion")
+        return result
+    old = storage.update_result(key, to_legacy)
+    body = {"criterionId": "c5", "by": "Проверяющий", "version": old["createdAt"]}
+    appeal = client.post(path + "/appeals", json={"criterionId": "c5", "comment": "Пересмотреть критерий"}).get_json()["appeals"][0]
+    assert client.post(path + "/confirm", json=body).status_code == 409
+    decision = client.post(path + f"/appeals/{appeal['id']}/decision",
+                           json={"status": "rejected", "reason": "Согласен с оценкой", "by": body["by"]})
+    assert decision.status_code == 200
+    confirmed = client.post(path + "/confirm", json=body).get_json()
+    assert len(confirmed["reviewLog"]) == 1
+    assert confirmed["reviewLog"][0]["source"] == "appeal"
+    assert confirmed["reviewLog"][0]["version"] == old["createdAt"]

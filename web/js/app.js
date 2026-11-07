@@ -2,7 +2,7 @@
 // and the public mount() entry point. Everything renders inside #cqa-d365-root.
 import { h, icon, clear, toast, setLayers } from './ui.js';
 import { api, setApiBase } from './api.js';
-import { state, boot, subscribe, pendingAppeals, loadGroup } from './store.js';
+import { state, boot, subscribe, pendingAppeals, loadGroup, refreshResults } from './store.js';
 import * as Scoring from './scoring.js';
 import { resumeJobs } from './jobs.js';
 import { D365Bridge } from './bridge.js';
@@ -75,7 +75,7 @@ function buildShell(root) {
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
 
   const ribbon = h('header', { class: 'ribbon' },
-    h('a', { class: 'rb-brand', href: '#/' },
+    h('a', { class: 'rb-brand', href: '#/', 'aria-label': 'Freedom Broker · Главная' },
       h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
       h('span', { class: 'rb-name' }, 'Freedom Broker'),
       h('span', { class: 'rb-title' }, 'Контроль качества')),
@@ -251,7 +251,14 @@ export async function mount(container, context = {}) {
   if (ctx.apiBase) setApiBase(ctx.apiBase);
   buildShell(root);
 
-  window.addEventListener('hashchange', route);
+  const syncReviews = () => refreshResults().catch((e) => toast(e.message, { type: 'error' }));
+  window.addEventListener('hashchange', () => {
+    route();
+    if (['/', '/dialogs', '/appeals'].includes(currentRoute())) syncReviews();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') syncReviews();
+  });
   D365Bridge.listen({
     openDialog: (cid) => { location.hash = `#/dialog/${encodeURIComponent(cid)}`; },
     setGroup: (g) => loadGroup(g).catch((e) => toast(e.message, { type: 'error' })),
