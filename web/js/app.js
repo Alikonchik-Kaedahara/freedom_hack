@@ -45,12 +45,23 @@ function renderNav() {
     nav.append(h('a', { href: `#${item.path}`, class: active ? 'active' : '' },
       icon(item.icon, 20), item.label, badge ? h('span', { class: 'badge' }, badge) : null));
   }
+  const tabbar = clear(document.getElementById('tabbar'));
+  for (const item of NAV) {
+    const active = item.path === '/' ? path === '/' : path.startsWith(item.path) || (item.path === '/dialogs' && path.startsWith('/dialog/'));
+    const badge = item.badge ? item.badge() : 0;
+    tabbar.append(h('a', { href: `#${item.path}`, class: active ? 'active' : '' },
+      h('span', { class: 'tab-icon' }, icon(item.icon, 22), badge ? h('span', { class: 'dot' }, badge) : null),
+      h('span', { class: 'tab-label' }, item.label)));
+  }
   const pill = clear(document.getElementById('datasetPill'));
   const ds = state.datasets.find((d) => d.groupId === state.group);
   pill.append(
     h('span', { class: 'ds-icon' }, icon('database', 18)),
     h('span', { class: 'ds-text' }, h('small', null, 'Набор диалогов'), h('b', null, ds ? `${ds.groupId} · ${ds.total}` : 'Не загружен')),
     icon('chevron', 16));
+  const chip = clear(document.getElementById('datasetChip'));
+  chip.append(icon('database', 15), ds ? `${ds.groupId} · ${ds.total}` : 'Набор', icon('chevron', 14));
+  document.body.classList.toggle('no-data', !state.group);
 }
 
 function route() {
@@ -70,7 +81,7 @@ function route() {
     const m = path.match(re);
     if (m) {
       cleanup = fn(view, ...m.slice(1).map((x) => (x ? decodeURIComponent(x) : x))) || null;
-      if (!samePage) main.scrollTop = 0;
+      if (!samePage) { main.scrollTop = 0; window.scrollTo(0, 0); }
       return;
     }
   }
@@ -78,6 +89,7 @@ function route() {
 }
 
 document.getElementById('datasetPill').addEventListener('click', () => openDatasetModal());
+document.getElementById('datasetChip').addEventListener('click', () => openDatasetModal());
 window.addEventListener('hashchange', route);
 subscribe((what) => {
   if (what === 'group') route();

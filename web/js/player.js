@@ -59,8 +59,8 @@ export function createPlayer({ src, transcript, onIndex }) {
     speedBtn.textContent = `${next}x`;
   });
   playBtn.addEventListener('click', () => (audio.paused ? audio.play() : audio.pause()));
-  audio.addEventListener('play', () => { playBtn.replaceChildren(icon('pause', 22)); loop(); });
-  audio.addEventListener('pause', () => { playBtn.replaceChildren(icon('play', 22)); cancelAnimationFrame(raf); draw(); });
+  audio.addEventListener('play', () => { playBtn.replaceChildren(icon('pause', 22)); playBtn.setAttribute('aria-label', 'Пауза'); loop(); });
+  audio.addEventListener('pause', () => { playBtn.replaceChildren(icon('play', 22)); playBtn.setAttribute('aria-label', 'Воспроизвести'); cancelAnimationFrame(raf); draw(); });
   audio.addEventListener('ended', () => { playBtn.replaceChildren(icon('play', 22)); });
   audio.addEventListener('loadedmetadata', () => {
     timeline = audioTimeline(transcript, audio.duration);

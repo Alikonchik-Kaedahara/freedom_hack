@@ -69,7 +69,7 @@ export function renderChecklists(root, id) {
 
     // ----- right: balance + apply -----
     const side = h('div', { class: 'builder-side' }, balanceCard(sum, markDirty), applyCard(valid));
-    return [head, tabs, h('div', { class: 'builder' }, left, side)];
+    return [head, tabs, h('div', { class: 'builder' }, left, side), mobileSum(sum)];
   }
 
   function critRow(c, i, markDirty) {
@@ -83,9 +83,11 @@ export function renderChecklists(root, id) {
       : (() => {
         const range = h('input', { type: 'range', min: 0, max: 50, step: 1, value: c.weight });
         const num = h('input', { class: 'input wnum', type: 'number', min: 0, max: 100, value: c.weight });
-        range.addEventListener('input', () => { num.value = range.value; c.weight = +range.value; dirty = true; refreshSide(); syncSave(); });
+        const fill = () => range.style.setProperty('--p', `${Math.min(100, (Number(range.value) / 50) * 100)}%`);
+        fill();
+        range.addEventListener('input', () => { num.value = range.value; c.weight = +range.value; dirty = true; fill(); refreshSide(); syncSave(); });
         range.addEventListener('change', draw);
-        num.addEventListener('input', () => { c.weight = Math.max(0, +num.value || 0); range.value = c.weight; dirty = true; refreshSide(); syncSave(); });
+        num.addEventListener('input', () => { c.weight = Math.max(0, +num.value || 0); range.value = c.weight; dirty = true; fill(); refreshSide(); syncSave(); });
         num.addEventListener('change', draw);
         const wrap = h('div', { class: 'weight', onclick: (e) => e.stopPropagation() }, range, num);
         return wrap;
@@ -201,6 +203,17 @@ export function renderChecklists(root, id) {
     const sum = round2(draft.criteria.filter((c) => c.type !== 'flag').reduce((a, c) => a + (Number(c.weight) || 0), 0));
     const old = page.querySelector('#balance');
     if (old) old.replaceWith(balanceCard(sum, () => { dirty = true; draw(); }));
+    page.querySelector('#msum')?.replaceWith(mobileSum(sum));
+  }
+
+  // Phones: weight total stays visible above the tab bar while editing.
+  function mobileSum(sum) {
+    const ok = sum === 100;
+    return h('div', { class: `m-sum ${ok ? 'ok' : 'bad'}`, id: 'msum' },
+      h('span', { class: 'm-sum-icon' }, icon(ok ? 'check' : 'alert', 16, 2.5)),
+      h('span', null, 'Сумма весов ', h('b', null, sum), ' / 100'),
+      !ok && sum > 0 ? h('button', { class: 'btn btn-sm btn-secondary', onclick: () => { normalize(); dirty = true; draw(); } }, 'Выровнять') : null,
+      dirty && ok ? h('button', { class: 'btn btn-sm btn-primary', onclick: save }, 'Сохранить') : null);
   }
 
   function normalize() {
