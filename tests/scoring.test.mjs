@@ -53,6 +53,14 @@ test('disputedIds: needsReview or low confidence', () => {
   assert.equal(summarize({ ...result, checklist: fixture.checklist }).disputed.length, 2);
 });
 
+test('disputedIds: a second opinion that disagrees (or lands one step away) is disputed too', () => {
+  const result = {
+    answers: { c1: { answer: 'yes', confidence: 'high' }, c2: { answer: 'no', confidence: 'low' } },
+    secondOpinion: { comparison: { agree: ['c1'], disagree: ['c7'], near: ['c4', 'c2'] } },
+  };
+  assert.deepEqual(disputedIds(result), ['c2', 'c7', 'c4']);
+});
+
 test('no applicable weighted criteria -> no total', () => {
   const checklist = { criteria: [{ id: 'x', type: 'binary', weight: 100, naAllowed: true }, { id: 'f', type: 'flag', weight: 0 }] };
   const s = score(checklist, { x: { answer: 'na' }, f: { answer: 'yes' } });

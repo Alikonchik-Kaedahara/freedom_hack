@@ -6,7 +6,7 @@ import { state, subscribe, refreshChecklists, saveSettings, resultFor } from '..
 import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 
-const COLORS = ['#0E4630', '#1A9F4B', '#19798B', '#3CC36A', '#5FB3C2', '#7A6FD0', '#9BCB5A', '#E0A91B', '#C25B9B', '#2F6FDB'];
+const COLORS = ['#1E7B4F', '#1A9F4B', '#19798B', '#3CC36A', '#5FB3C2', '#7A6FD0', '#9BCB5A', '#E0A91B', '#C25B9B', '#2F6FDB'];
 const CHANNELS = { 'agent chat': 'Чаты', 'voice call': 'Звонки' };
 const TYPES = [['binary', 'Да / Нет'], ['scale', 'Шкала'], ['flag', 'Грубая ошибка']];
 const EXPORT_IDS = ['contact', 'discovery', 'identification', 'consultation', 'empathy', 'dialogue', 'closure', 'critical'];
@@ -42,13 +42,13 @@ export function renderChecklists(root, id) {
     const markDirty = () => { dirty = true; draw(); };
 
     const head = h('div', { class: 'page-head' },
-      h('h1', null, 'Конструктор чек-листа'),
+      h('div', null, h('h1', null, 'Конструктор чек-листа'), h('div', { class: 'sub' }, 'Критерии, веса, шкалы и условия N/A. Сохранение создаёт новую версию.')),
       h('div', { class: 'head-actions' },
         dirty ? h('button', { class: 'btn btn-glass', onclick: () => { draft = clone(state.checklists.find((c) => c.id === draft.id) || draft); dirty = false; draw(); } }, 'Отменить') : null,
-        (saveBtn = h('button', { class: 'btn btn-primary btn-lg', disabled: !dirty || !valid, onclick: save }, icon('check', 18), 'Сохранить'))));
+        (saveBtn = h('button', { class: 'btn btn-primary btn-lg', disabled: !dirty || !valid, onclick: save }, icon('check', 15), 'Сохранить версию'))));
 
-    const tabs = h('div', { style: { display: 'flex', gap: '10px', alignItems: 'center', marginTop: '-8px', marginBottom: '22px', flexWrap: 'wrap' } },
-      h('div', { class: 'segmented on-dark' }, state.checklists.map((c) =>
+    const tabs = h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' } },
+      h('div', { class: 'segmented' }, state.checklists.map((c) =>
         h('button', { class: c.id === draft.id ? 'on' : '', onclick: () => switchTo(c.id) },
           icon(c.channel === 'voice call' ? 'phone' : 'chat', 15), c.name))),
       h('button', { class: 'btn btn-glass btn-sm', onclick: createNew }, icon('plus', 15), 'Новый'));
@@ -65,11 +65,11 @@ export function renderChecklists(root, id) {
       !isActive && !dirty ? h('button', { class: 'icon-btn', title: 'Удалить чек-лист', onclick: remove }, icon('trash', 17)) : null);
 
     const rows = h('div', { class: 'crit-rows' }, draft.criteria.map((c, i) => critRow(c, i, markDirty)));
-    const left = h('div', { class: 'card', style: { overflow: 'hidden' } }, meta, rows,
-      h('button', { class: 'add-crit', onclick: () => addCriterion(markDirty) }, icon('plus', 18), 'Добавить критерий'));
+    const left = h('div', { class: 'card', style: { overflow: 'hidden' } }, meta, allocBar(sum, markDirty), rows,
+      h('button', { class: 'add-crit', onclick: () => addCriterion(markDirty) }, icon('plus', 16), 'Добавить критерий'));
 
     // ----- right: balance + apply -----
-    const side = h('div', { class: 'builder-side' }, balanceCard(sum, markDirty), applyCard(valid));
+    const side = h('div', { class: 'builder-side' }, applyCard(valid));
     return [head, tabs, h('div', { class: 'builder' }, left, side), mobileSum(sum)];
   }
 
@@ -124,14 +124,17 @@ export function renderChecklists(root, id) {
       h('div', { class: 'field' }, h('label', null, 'Тип ответа'),
         h('div', { class: 'segmented' }, TYPES.map(([v, l]) =>
           h('button', { class: c.type === v ? 'on' : '', type: 'button', onclick: () => changeType(c, v, markDirty) }, l)))),
-      h('div', { class: 'field' }, h('label', null, 'Правило оценки'),
+      h('div', { class: 'field' }, h('label', null, 'Формулировка правила'),
         h('textarea', { class: 'textarea', rows: 3, value: c.description || '', placeholder: 'Когда ставить «Да», что проверять', oninput: (e) => set('description', e.target.value) })),
       c.type === 'scale' ? scaleEditor(c, markDirty) : null,
       c.type !== 'flag' ? h('div', { class: 'field' },
         h('label', { class: 'switch' },
           h('input', { type: 'checkbox', checked: !!c.naAllowed, onchange: (e) => { c.naAllowed = e.target.checked; markDirty(); } }),
           h('span', { class: 'track' }), 'Разрешить N/A'),
-        c.naAllowed ? h('textarea', { class: 'textarea', rows: 2, value: c.naRule || '', placeholder: 'Когда критерий неприменим', oninput: (e) => set('naRule', e.target.value) }) : null) : null,
+        c.naAllowed ? h('textarea', { class: 'textarea', rows: 2, value: c.naRule || '', placeholder: 'Условие N/A: когда критерий неприменим', oninput: (e) => set('naRule', e.target.value) }) : null) : null,
+      // Why we read an ambiguous rule this way. Shown to reviewers in the card; the model gets only the rule.
+      h('div', { class: 'field interp-field' }, h('label', null, 'Наша трактовка ', h('span', { class: 'hint' }, 'почему правило читаем именно так — видно проверяющему, модели не передаётся')),
+        h('textarea', { class: 'textarea', rows: 3, value: c.interpretation || '', placeholder: 'Например: приветствие бота оператору не засчитывается, потому что…', oninput: (e) => set('interpretation', e.target.value) })),
       h('div', null, h('button', { class: 'link-btn danger', type: 'button', onclick: () => {
         draft.criteria = draft.criteria.filter((x) => x !== c); openRows.delete(c.id); markDirty();
       } }, icon('trash', 15), 'Удалить критерий')));
@@ -140,7 +143,7 @@ export function renderChecklists(root, id) {
 
   function scaleEditor(c, markDirty) {
     const steps = c.scale || (c.scale = []);
-    return h('div', { class: 'field' }, h('label', null, 'Ступени шкалы'),
+    return h('div', { class: 'field' }, h('label', null, 'Шкала оценок'),
       h('div', { class: 'steps' },
         steps.map((s, i) => h('div', { class: 'step' },
           h('input', { class: 'input', type: 'number', value: s.value, oninput: (e) => { s.value = Number(e.target.value); dirty = true; syncSave(); }, onchange: () => { steps.sort((a, b) => b.value - a.value); draw(); } }),
@@ -170,7 +173,7 @@ export function renderChecklists(root, id) {
     const c = {
       id: `c${Date.now().toString(36)}`, code: next, name: 'Новый критерий',
       section: weighted[weighted.length - 1]?.section || '', type: 'binary', weight: 0,
-      naAllowed: false, description: '', naRule: '',
+      naAllowed: false, description: '', naRule: '', interpretation: '', exportId: '',
     };
     const flagIdx = draft.criteria.findIndex((x) => x.type === 'flag');
     if (flagIdx >= 0) draft.criteria.splice(flagIdx, 0, c); else draft.criteria.push(c);
@@ -184,31 +187,45 @@ export function renderChecklists(root, id) {
     }, 60);
   }
 
-  function balanceCard(sum, markDirty) {
+  // 100% stacked allocation bar: one segment per weighted criterion (01–07), live while sliders move.
+  function allocBar(sum, markDirty) {
     const weighted = draft.criteria.filter((c) => c.type !== 'flag' && Number(c.weight) > 0);
-    const total = weighted.reduce((a, c) => a + Number(c.weight), 0) || 1;
-    const R = 80, C = 2 * Math.PI * R;
-    let offset = 0;
-    const arcs = weighted.map((c, i) => {
-      const len = (Number(c.weight) / Math.max(total, 100)) * C;
-      const el = `<circle r="${R}" cx="110" cy="110" fill="none" stroke="${COLORS[i % COLORS.length]}" stroke-width="30" stroke-dasharray="${Math.max(0, len - 2)} ${C}" stroke-dashoffset="${-offset}"/>`;
-      offset += len;
-      return el;
-    }).join('');
+    const scale = Math.max(sum, 100);
+    const NS = 'http://www.w3.org/2000/svg';
+    const bar = document.createElementNS(NS, 'svg');
+    bar.setAttribute('class', 'alloc'); bar.setAttribute('viewBox', '0 0 1000 28'); bar.setAttribute('preserveAspectRatio', 'none');
+    bar.setAttribute('role', 'img'); bar.setAttribute('aria-label', `Сумма весов ${sum} из 100`);
+    const bg = document.createElementNS(NS, 'rect');
+    Object.entries({ x: 0, y: 0, width: 1000, height: 28, class: 'trk' }).forEach(([k, v]) => bg.setAttribute(k, v));
+    bar.append(bg);
+    let x = 0;
+    weighted.forEach((c, i) => {
+      const w = (Number(c.weight) / scale) * 1000;
+      const r = document.createElementNS(NS, 'rect');
+      Object.entries({ x, y: 0, width: Math.max(0, w - 2), height: 28, fill: COLORS[i % COLORS.length] }).forEach(([k, v]) => r.setAttribute(k, v));
+      const t = document.createElementNS(NS, 'title'); t.textContent = `${c.code} ${c.name} — ${c.weight}`; r.append(t);
+      bar.append(r);
+      if (w > 46) {
+        const tx = document.createElementNS(NS, 'text');
+        tx.setAttribute('x', x + 8); tx.setAttribute('y', 18); tx.textContent = `${c.code} · ${c.weight}`;
+        bar.append(tx);
+      }
+      x += w;
+    });
     const ok = sum === 100;
-    return h('div', { class: 'card card-pad', id: 'balance' },
-      h('h3', { class: 'card-title' }, 'Баланс весов'),
-      h('div', { class: 'donut-wrap', html: `<svg viewBox="0 0 220 220"><circle r="${R}" cx="110" cy="110" fill="none" stroke="#EDF1EE" stroke-width="30"/>${arcs}</svg>` },
-        h('div', { class: `donut-center ${ok ? '' : 'bad'}` }, h('div', null, h('small', null, 'Сумма весов'), h('b', null, `${sum}`), h('small', null, ok ? 'из 100' : 'нужно 100')))),
-      !ok && sum > 0 ? h('button', { class: 'btn btn-secondary btn-block', onclick: () => { normalize(); markDirty(); } }, 'Выровнять до 100') : null,
-      h('div', { class: 'legend' }, weighted.map((c, i) => h('div', { class: 'legend-row' },
-        h('i', { style: { background: COLORS[i % COLORS.length] } }), h('span', null, `${c.code} ${c.name}`), h('b', null, c.weight)))));
+    return h('div', { class: 'alloc-wrap', id: 'balance' },
+      h('div', { class: 'alloc-head' },
+        h('span', { class: `sum ${ok ? 'ok' : 'bad'}` }, 'Сумма базовых весов: ', h('b', null, `${sum} / 100`), ok ? ' ✓' : ''),
+        !ok && sum > 0 ? h('button', { class: 'btn btn-secondary btn-xs', onclick: () => { normalize(); markDirty(); } }, 'Нормализовать до 100') : null),
+      bar,
+      h('div', { class: 'alloc-legend' }, weighted.map((c, i) =>
+        h('span', { title: c.name }, h('i', { style: { background: COLORS[i % COLORS.length] } }), `${c.code} ${c.name.length > 22 ? c.name.slice(0, 21) + '…' : c.name}`, h('b', null, c.weight)))));
   }
 
   function refreshSide() {
     const sum = round2(draft.criteria.filter((c) => c.type !== 'flag').reduce((a, c) => a + (Number(c.weight) || 0), 0));
     const old = page.querySelector('#balance');
-    if (old) old.replaceWith(balanceCard(sum, () => { dirty = true; draw(); }));
+    if (old) old.replaceWith(allocBar(sum, () => { dirty = true; draw(); }));
     page.querySelector('#msum')?.replaceWith(mobileSum(sum));
   }
 
@@ -240,7 +257,7 @@ export function renderChecklists(root, id) {
     return h('div', { class: 'card card-pad' },
       h('h3', { class: 'card-title' }, 'Применение'),
       cmp ? h('div', null,
-        h('div', { style: { color: 'var(--muted)', fontSize: '13px' } }, `Средний балл · ${cmp.n} ${pluralRu(cmp.n, 'диалог', 'диалога', 'диалогов')}`),
+        h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px' } }, `Средний балл · ${cmp.n} ${pluralRu(cmp.n, 'диалог', 'диалога', 'диалогов')}`),
         h('div', { class: 'compare' },
           h('div', { class: 'c old' }, h('small', null, `Версия ${cmp.oldVersion}`), h('b', null, fmtScore(cmp.old))),
           h('span', { class: 'arr' }, icon('right', 26, 2.5)),
@@ -250,7 +267,7 @@ export function renderChecklists(root, id) {
         class: 'btn btn-primary btn-lg btn-block', disabled: dirty || !valid || running || !ids.length,
         onclick: apply,
       }, icon('sparkles', 18), ids.length ? `Применить к ${ids.length} ${pluralRu(ids.length, 'диалогу', 'диалогам', 'диалогам')}` : 'Нет диалогов этого канала'),
-      dirty ? h('div', { style: { color: 'var(--muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px' } }, 'Сначала сохраните изменения') : null);
+      dirty ? h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px' } }, 'Сначала сохраните изменения') : null);
   }
 
   // Average total for dialogs re-evaluated with the current version vs their previous evaluation.

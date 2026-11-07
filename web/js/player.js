@@ -46,8 +46,22 @@ export function createPlayer({ src, transcript, onIndex }) {
 
   const playBtn = h('button', { class: 'play', 'aria-label': 'Воспроизвести', disabled: true }, icon('play', 22));
   const timeEl = h('div', { class: 'time' }, '00:00 ', h('span', null, '/ --:--'));
-  const canvas = h('canvas');
-  const wave = h('div', { class: 'wave' }, canvas);
+  // Waveform as inline SVG: gray bars, the same bars in green clipped to the played part, a playhead.
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs = {}) => { const e = document.createElementNS(NS, tag); for (const [k, v] of Object.entries(attrs)) e.setAttribute(k, v); return e; };
+  const clipId = `cqa-wave-${Math.random().toString(36).slice(2, 8)}`;
+  const svgEl = mk('svg', { preserveAspectRatio: 'none', role: 'img', 'aria-label': 'Звуковая волна записи' });
+  const clipRect = mk('rect', { x: 0, y: 0, width: 0, height: 100 });
+  const clip = mk('clipPath', { id: clipId }); clip.append(clipRect);
+  const defs = mk('defs'); defs.append(clip);
+  const baseBars = mk('g', { fill: 'rgba(255,255,255,.32)' });
+  const playedBars = mk('g', { fill: '#00C864', 'clip-path': `url(#${clipId})` });
+  const head = mk('g', { fill: '#fff', visibility: 'hidden' });
+  const headLine = mk('rect', { width: 2, y: 2 }); const headDot = mk('circle', { r: 4.5 });
+  head.append(headLine, headDot);
+  svgEl.append(defs, baseBars, playedBars, head);
+  const wave = h('div', { class: 'wave' }, svgEl);
+  let builtFor = '';
   const speeds = [1, 1.25, 1.5, 2];
   const speedBtn = h('button', { class: 'speed', type: 'button' }, '1x');
   const loading = h('span', { class: 'loading' }, 'Загрузка записи…');
@@ -97,35 +111,38 @@ export function createPlayer({ src, transcript, onIndex }) {
     if (idx !== lastIndex) { lastIndex = idx; onIndex?.(idx, !audio.paused); }
   }
 
-  function draw() {
-    const dpr = window.devicePixelRatio || 1;
-    const w = wave.clientWidth, hgt = wave.clientHeight;
-    if (!w) return;
-    if (canvas.width !== Math.round(w * dpr)) { canvas.width = Math.round(w * dpr); canvas.height = Math.round(hgt * dpr); }
-    const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, hgt);
+  function buildBars(w, hgt) {
     const barW = 3, gap = 2, n = Math.floor(w / (barW + gap));
-    const progress = audio.duration ? audio.currentTime / audio.duration : 0;
+    const parts = [];
     for (let i = 0; i < n; i++) {
       const p = peaks ? peaks[Math.floor((i / n) * peaks.length)] : 0.15 + 0.1 * Math.abs(Math.sin(i * 0.7));
       const bh = Math.max(3, p * (hgt - 6));
-      ctx.fillStyle = i / n <= progress ? '#6FE09A' : 'rgba(255,255,255,.32)';
-      const x = i * (barW + gap);
-      roundRect(ctx, x, (hgt - bh) / 2, barW, bh, 1.5);
+      parts.push(`<rect x="${i * (barW + gap)}" y="${((hgt - bh) / 2).toFixed(1)}" width="${barW}" height="${bh.toFixed(1)}" rx="1.5"/>`);
     }
-    if (audio.duration) {
-      const x = progress * w;
-      ctx.fillStyle = '#fff';
-      ctx.fillRect(x - 1, 2, 2, hgt - 4);
-      ctx.beginPath(); ctx.arc(x, hgt / 2, 5, 0, Math.PI * 2); ctx.fill();
-    }
+    baseBars.innerHTML = parts.join('');
+    playedBars.innerHTML = baseBars.innerHTML;
   }
 
-  function roundRect(ctx, x, y, w, hh, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + hh, r); ctx.arcTo(x + w, y + hh, x, y + hh, r);
-    ctx.arcTo(x, y + hh, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.fill();
+  function draw() {
+    const w = wave.clientWidth, hgt = wave.clientHeight;
+    if (!w) return;
+    const key = `${w}x${hgt}:${peaks ? 1 : 0}`;
+    if (key !== builtFor) {
+      svgEl.setAttribute('viewBox', `0 0 ${w} ${hgt}`);
+      clipRect.setAttribute('height', hgt);
+      headLine.setAttribute('height', hgt - 4);
+      headDot.setAttribute('cy', hgt / 2);
+      buildBars(w, hgt);
+      builtFor = key;
+    }
+    const progress = audio.duration ? audio.currentTime / audio.duration : 0;
+    const x = progress * w;
+    clipRect.setAttribute('width', x);
+    if (audio.duration) {
+      head.setAttribute('visibility', 'visible');
+      headLine.setAttribute('x', x - 1);
+      headDot.setAttribute('cx', x);
+    }
   }
 
   // Load once: the same bytes feed the <audio> element and the waveform.

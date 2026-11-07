@@ -7,7 +7,10 @@ import { displayTimes } from './dialog.js';
 
 let tab = 'pending';
 
+let viewRoot = null;
+
 export function renderAppeals(root) {
+  viewRoot = root;
   const draw = () => root.replaceChildren(build());
   draw();
   return subscribe((w) => { if (w === 'results') draw(); });
@@ -19,7 +22,7 @@ function build() {
   const done = items.filter((x) => x.appeal.status !== 'pending');
   const list = tab === 'pending' ? pending : done;
 
-  const seg = h('div', { class: 'segmented on-dark' },
+  const seg = h('div', { class: 'segmented' },
     h('button', { class: tab === 'pending' ? 'on' : '', onclick: () => { tab = 'pending'; rerender(); } }, 'На рассмотрении', h('span', { class: 'count' }, pending.length)),
     h('button', { class: tab === 'done' ? 'on' : '', onclick: () => { tab = 'done'; rerender(); } }, 'Решённые', h('span', { class: 'count' }, done.length)));
 
@@ -33,7 +36,7 @@ function build() {
           h('p', null, 'Апелляцию можно подать из карточки диалога: откройте критерий и нажмите «Оспорить».'))));
 }
 
-function rerender() { document.getElementById('view').replaceChildren(build()); }
+function rerender() { viewRoot?.replaceChildren(build()); }
 
 function row({ result, appeal }) {
   const c = result.checklist.criteria.find((x) => x.id === appeal.criterionId);
@@ -49,10 +52,10 @@ function row({ result, appeal }) {
     h('div', { class: 'comment' }, `«${appeal.comment}»`),
     h('div', { class: 'right' },
       h('span', { class: `tag ${st[0]}` }, st[1]),
-      h('span', { style: { color: 'var(--muted)', fontSize: '12.5px' } }, fmtDate(appeal.createdAt))));
+      h('span', { style: { color: 'var(--cqa-text-muted)', fontSize: '12.5px' } }, fmtDate(appeal.createdAt))));
 }
 
-export function openReview(result, appeal) {
+export function openReview(result, appeal, opts = {}) {
   const c = result.checklist.criteria.find((x) => x.id === appeal.criterionId);
   const rec = state.byId[result.conversationId];
   const times = rec ? displayTimes(rec.transcript) : [];
@@ -61,7 +64,7 @@ export function openReview(result, appeal) {
   const before = score(result.checklist, finalAnswers(result)).total;
   const decided = appeal.status !== 'pending';
 
-  let choice = decided ? (appeal.status === 'accepted' ? appeal.decision?.answer : 'keep') : null;
+  let choice = decided ? (appeal.status === 'accepted' ? appeal.decision?.answer : 'keep') : (opts.preset || null);
   const reason = h('textarea', { class: 'textarea', rows: 3, placeholder: 'Причина решения', value: appeal.decision?.reason || '' });
   if (decided) reason.disabled = true;
 
@@ -120,7 +123,7 @@ export function openReview(result, appeal) {
         h('div', { class: 'quote' }, appeal.comment),
         h('div', { class: 'rm-ai' }, h('span', { class: `tag ${aiV.cls === 'ok' ? 'green' : aiV.cls === 'fail' ? 'red' : aiV.cls === 'part' ? 'amber' : ''}` },
           `ИИ: ${aiV.text}${c.type === 'scale' && aiV.text !== 'N/A' ? ` / ${aiV.max}` : ''}`), h('span', null, ai.explanation || '')),
-        ai.confidence ? h('div', { style: { fontSize: '12.5px', color: 'var(--muted)', marginTop: '6px' } },
+        ai.confidence ? h('div', { style: { fontSize: '12px', color: 'var(--cqa-text-muted)', marginTop: '6px' } },
           `Уверенность модели: ${CONFIDENCE_LABEL[ai.confidence] || ai.confidence}`,
           disputeLabel(ai) ? ` · ${disputeLabel(ai).text}${ai.issues?.length ? `: ${ai.issues.join(' ')}` : ''}` : '') : null,
         idx.size ? fragment : null),

@@ -12,6 +12,7 @@ export const state = {
   checklists: [],
   settings: null,
   job: null,
+  knowledge: null,
 };
 
 const listeners = new Set();
@@ -19,8 +20,8 @@ export function subscribe(fn) { listeners.add(fn); return () => listeners.delete
 export function emit(what) { for (const fn of listeners) fn(what); }
 
 export async function boot() {
-  const [datasets, checklists, settings] = await Promise.all([api.datasets(), api.checklists(), api.settings()]);
-  Object.assign(state, { datasets, checklists, settings });
+  const [datasets, checklists, settings, knowledge] = await Promise.all([api.datasets(), api.checklists(), api.settings(), api.knowledge().catch(() => null)]);
+  Object.assign(state, { datasets, checklists, settings, knowledge });
   const group = (datasets.find((d) => d.groupId === settings.activeGroup) || datasets[datasets.length - 1])?.groupId;
   if (group) await loadGroup(group, false);
 }
@@ -55,6 +56,8 @@ function setResults(results) {
 }
 
 export function putResult(result) {
+  // single-result responses carry no operator name; keep the one the list gave us
+  if (result.operator == null && state.results[result.key]?.operator != null) result.operator = state.results[result.key].operator;
   state.results[result.key] = result;
   state.summaries[result.key] = summarize(result);
   emit('results');
@@ -73,6 +76,12 @@ export async function saveSettings(patch) {
   state.settings = await api.saveSettings(patch);
   emit('settings');
   return state.settings;
+}
+
+export async function refreshKnowledge() {
+  state.knowledge = await api.knowledge(state.group);
+  emit('knowledge');
+  return state.knowledge;
 }
 
 export function pendingAppeals() {

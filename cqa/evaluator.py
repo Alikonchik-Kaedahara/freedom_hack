@@ -133,18 +133,28 @@ def render_transcript(record):
     )
 
 
-def build_schema(checklist):
+def is_consultation(c):
+    """The criterion the knowledge base applies to (results.json code `consultation`, PDF code 04)."""
+    return c.get("exportId") == "consultation" or str(c.get("code") or "") == "04"
+
+
+def build_schema(checklist, with_knowledge=False):
     props = {}
     for c in checklist["criteria"]:
+        fields = {
+            "evidence": {"type": "array", "items": {"type": "integer"}},
+            "explanation": {"type": "string"},
+            "verdict": {"type": "string", "enum": _verdicts(c)},
+            "confidence": {"type": "string", "enum": CONFIDENCE},
+        }
+        required = ["evidence", "explanation", "verdict", "confidence"]
+        if with_knowledge and is_consultation(c):
+            fields["contradicts"] = {"type": "array", "items": {"type": "string"}}
+            required.append("contradicts")
         props[c["id"]] = {
             "type": "object",
-            "properties": {
-                "evidence": {"type": "array", "items": {"type": "integer"}},
-                "explanation": {"type": "string"},
-                "verdict": {"type": "string", "enum": _verdicts(c)},
-                "confidence": {"type": "string", "enum": CONFIDENCE},
-            },
-            "required": ["evidence", "explanation", "verdict", "confidence"],
+            "properties": fields,
+            "required": required,
             "additionalProperties": False,
         }
     return {
@@ -155,11 +165,13 @@ def build_schema(checklist):
     }
 
 
-def build_prompt(record, checklist):
+def build_prompt(record, checklist, knowledge_text=""):
     system = SYSTEM_PROMPT
     if record.get("channel") == "voice call":
         system += "\n\n" + CALL_NOTE
     system += "\n\nЧЕК-ЛИСТ\n\n" + render_checklist(checklist)
+    if knowledge_text:
+        system += "\n\n" + knowledge_text
     user = (
         f"Диалог {record['conversation_id']} · канал: {record.get('channel')} · язык набора: {record.get('language')}\n\n"
         f"{render_transcript(record)}\n\n"
@@ -175,7 +187,7 @@ def prompt_hash(system):
 
 # ---------- validation: LLM proposes, code verifies ----------
 
-def validate(raw, checklist, record):
+def validate(raw, checklist, record, known_facts=None):
     """Normalize a raw model answer and list every problem found.
 
     Returns (answers, problems). `answers` is the normalized per-criterion dict
@@ -249,6 +261,11 @@ def validate(raw, checklist, record):
         answers[c["id"]] = {
             "answer": answer, "explanation": explanation, "evidence": evidence, "confidence": confidence,
         }
+        if is_consultation(c) and isinstance(item.get("contradicts"), list):
+            ids = [str(x) for x in item["contradicts"] if isinstance(x, (str, int))]
+            if known_facts is not None:
+                ids = [x for x in ids if x in known_facts]
+            answers[c["id"]]["contradicts"] = sorted(set(ids))
 
     flat = [p for plist in problems.values() for p in plist]
     return answers, flat
@@ -406,11 +423,11 @@ def check_engine(settings):
         from . import replay
         n = replay.count_saved()
         if not n:
-            return {"ok": False, "message": "Нет сохранённых ответов: загрузите demo/sample или выполните python manage.py snapshot", "saved": 0}
+            return {"ok": False, "message": "Сохранённых оценок пока нет — выберите облачную модель или модель на своём сервере", "saved": 0}
         return {"ok": True, "message": f"Сохранённых ответов: {n}", "saved": n}
     import os
     has_key = bool(settings.get("cloud", {}).get("apiKey") or os.environ.get("ANTHROPIC_API_KEY"))
-    return {"ok": has_key, "message": "Ключ API задан" if has_key else "Нужен ключ Claude API"}
+    return {"ok": has_key, "message": "Ключ API подключён" if has_key else "Укажите ключ API, чтобы начать оценку"}
 
 
 # ---------- main entry ----------
@@ -419,14 +436,19 @@ def _format_problems(problems):
     return "\n".join(f"- {p['message']}" for p in problems)
 
 
-def evaluate(record, checklist, settings, max_attempts=MAX_ATTEMPTS):
+def evaluate(record, checklist, settings, max_attempts=MAX_ATTEMPTS, use_knowledge=True):
     """Evaluate one dialog. Returns (answers, usage, engine, meta).
 
     meta: attempts made, prompt hash and problems that stayed unresolved
     (those criteria carry needsReview=true inside `answers`).
     """
-    system, user = build_prompt(record, checklist)
-    schema = build_schema(checklist)
+    from . import knowledge
+
+    kb = knowledge.get() if use_knowledge else None
+    known_facts = set(knowledge.by_id(kb)) if kb else set()
+    knowledge_text = knowledge.render_for_prompt(kb) if known_facts else ""
+    system, user = build_prompt(record, checklist, knowledge_text)
+    schema = build_schema(checklist, with_knowledge=bool(known_facts))
     engine_name = settings.get("engine") or "cloud"
     messages = [{"role": "user", "content": user}]
     usage_total = {"inputTokens": 0, "outputTokens": 0, "costUsd": 0}
@@ -454,7 +476,7 @@ def evaluate(record, checklist, settings, max_attempts=MAX_ATTEMPTS):
             messages += [{"role": "assistant", "content": text or "{}"},
                          {"role": "user", "content": FIX_NOTE.format(problems=_format_problems(problems))}]
             continue
-        answers, problems = validate(raw, checklist, record)
+        answers, problems = validate(raw, checklist, record, known_facts if known_facts else None)
         if not problems or engine_name == "replay":
             break
         if attempt < max_attempts:

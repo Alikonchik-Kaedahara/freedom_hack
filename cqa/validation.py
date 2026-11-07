@@ -77,6 +77,7 @@ def validate_checklist(item):
                 raise ValidationError(f"Критерий {label}: код выгрузки «{export_id}» уже занят другим критерием")
             seen_export.add(export_id)
         c["exportId"] = export_id
+        c["interpretation"] = str(c.get("interpretation") or "").strip()
         if ctype == "scale":
             steps = c.get("scale")
             if not isinstance(steps, list) or len(steps) < 2:

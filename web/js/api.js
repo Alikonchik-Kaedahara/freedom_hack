@@ -1,7 +1,13 @@
 // Thin client for the CQA server API. All paths are relative so the UI can be
 // hosted under any base path (e.g. as a Dynamics 365 web resource behind a proxy).
 
-const BASE = window.CQA_API_BASE || '';
+let BASE = window.CQA_API_BASE || '';
+
+/** Point the widget at a CQA server on another origin (e.g. when embedded in Dynamics 365). */
+export function setApiBase(base) {
+  BASE = (base || '').replace(/\/$/, '');
+  window.CQA_API_BASE = BASE;
+}
 
 async function req(method, url, body) {
   const res = await fetch(BASE + url, {
@@ -54,6 +60,16 @@ export const api = {
   decide: (key, id, body) => req('POST', `/api/results/${e(key)}/appeals/${e(id)}/decision`, body),
 
   evaluate: (body) => req('POST', '/api/evaluate', body),
+  secondOpinion: (body) => req('POST', '/api/second-opinion', body),
+  quality: (g) => req('GET', `/api/quality?group=${e(g)}`),
+  uploadCalibration: (file) => upload('/api/quality/calibration', file),
+  clearCalibration: () => req('DELETE', '/api/quality/calibration'),
+  operators: (g) => req('GET', `/api/operators?group=${e(g)}`),
+  setOperator: (key, name) => req('PUT', `/api/results/${e(key)}/operator`, { name }),
+  knowledge: (g) => req('GET', `/api/knowledge${g ? `?group=${e(g)}` : ''}`),
+  saveKnowledge: (doc) => req('PUT', '/api/knowledge', doc),
+  resetKnowledge: () => req('POST', '/api/knowledge/reset'),
+  reportUrl: (g, cid) => `${BASE}/report/${e(g)}/${e(cid)}`,
   job: (id) => req('GET', `/api/jobs/${e(id)}`),
   jobs: () => req('GET', '/api/jobs'),
 

@@ -73,13 +73,16 @@ export function score(checklist, answers) {
 
 /**
  * Criteria the reviewer should look at: the model's answer failed validation after all
- * retries (needsReview) or the model itself reported low confidence. Mirrors cqa/scoring.py.
+ * retries (needsReview), the model itself reported low confidence, or a second opinion
+ * gave a different verdict. Mirrors cqa/scoring.py.
  */
 export function disputedIds(result) {
   const out = [];
   for (const [id, a] of Object.entries(result?.answers || {})) {
     if (a?.needsReview || a?.confidence === 'low') out.push(id);
   }
+  const cmp = result?.secondOpinion?.comparison || {};
+  for (const id of [...(cmp.disagree || []), ...(cmp.near || [])]) if (!out.includes(id)) out.push(id);
   return out;
 }
 
