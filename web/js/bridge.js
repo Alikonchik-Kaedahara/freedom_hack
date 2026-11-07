@@ -45,8 +45,31 @@ export const D365Bridge = {
     return ctx;
   },
 
-  /** True only when a real Xrm object is reachable, never in the standalone preview. */
+  /** True when the widget is attached to an Xrm host: the real CRM, or the emulated host of the preview. */
   get ready() { return !!this.xrm; },
+  simulated: false,
+
+  /**
+   * Host preview: the page plays the role of Dynamics 365 and provides a minimal Xrm object
+   * (global context, WebApi stub), so the same bridge code path runs as inside the CRM.
+   * A real Xrm always wins and is never replaced.
+   */
+  connectEmulatedHost() {
+    if (this.xrm && !this.simulated) return;
+    this.xrm = {
+      Utility: { getGlobalContext: () => ({ userSettings: { userName: 'Супервайзер (демо)' }, getClientUrl: () => location.origin }) },
+      WebApi: { retrieveMultipleRecords: async () => ({ entities: [] }), retrieveRecord: async () => ({}) },
+      Page: { data: { entity: { getId: () => this.context.recordId || '' } } },
+    };
+    this.simulated = true;
+    this.context = { ...this.context, xrm: true, emulated: true, userName: 'Супервайзер (демо)' };
+  },
+  disconnectEmulatedHost() {
+    if (!this.simulated) return;
+    this.xrm = null;
+    this.simulated = false;
+    this.context = { ...this.context, xrm: false, emulated: false };
+  },
 
   post(type, payload = {}) {
     if (window.parent === window) return;

@@ -139,8 +139,6 @@ p { margin: 0; }
 .cqa-d365-top .bridge.wait i { background: var(--cqa-warn-solid); }
 .cqa-d365-top .avatar { width: 26px; height: 26px; border-radius: 50%; background: #3A6EA5; display: grid; place-items: center; font-size: 11px; font-weight: 700; }
 .cqa-host-on .cqa-d365-rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding-top: 8px; background: #FAF9F8; border-right: 1px solid #E1DFDD; }
-.cqa-d365-rail span { width: 36px; height: 36px; border-radius: 4px; display: grid; place-items: center; color: #605E5C; }
-.cqa-d365-rail span.on { background: #EDEBE9; color: var(--cqa-brand-primary); box-shadow: inset 3px 0 0 var(--cqa-brand-primary); }
 .cqa-host-on .cqa-app { margin: 10px; border: 1px solid #E1DFDD; border-radius: 4px; overflow: auto; background: var(--cqa-bg-canvas); box-shadow: 0 1.6px 3.6px rgba(0,0,0,.08); }
 .cqa-app { flex: 1; min-width: 0; position: relative; }
 
@@ -687,12 +685,120 @@ p { margin: 0; }
 :scope.no-data .tabbar { display: none !important; }
 .empty-icon { width: 40px; height: 40px; border-radius: var(--cqa-radius); background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); display: grid; place-items: center; flex: none; }
 
+/* ============ v3: Fluent light workspace (Freedom Broker × Dynamics 365) ============ */
+:scope {
+  --cqa-bg-canvas: #F4F6F5;
+  --cqa-text-primary: #090E0C;
+  --cqa-brand-primary: #009951;
+  --cqa-brand-hover: #007F43;
+  --cqa-brand-action: #00C864;
+  --cqa-header: #0B3324;
+  --cqa-d365-bar: #0B1A2E;
+  --cqa-bar-good: #009951;
+  --cqa-bar-low: #EF4444;
+  --cqa-ribbon: 52px;
+  --cqa-chrome: 52px;
+  --cqa-shadow: none;
+}
+:scope.cqa-host-on { --cqa-chrome: 96px; }
+.card { box-shadow: none; }
+
+/* app header: logo, product title, (tabs when there is no CRM rail), bridge badge, actions */
+.ribbon { background: var(--cqa-header); border-bottom: 0; gap: 14px; padding: 0 16px; }
+.rb-badge { display: none; }
+.rb-title { display: flex; align-items: center; padding-left: 14px; border-left: 1px solid rgba(255, 255, 255, .2); color: #fff; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.cqa-host-on .rb-tabs { visibility: hidden; }
+.rb-tabs a.active::after { background: var(--cqa-brand-action); box-shadow: none; }
+.rb-tabs a.active .ic { color: var(--cqa-brand-action); }
+.bridge-badge { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 12px; border-radius: 14px; background: var(--cqa-pass-bg); border: 1px solid var(--cqa-pass-border); color: var(--cqa-pass-text); font-size: 12.5px; font-weight: 600; white-space: nowrap; cursor: default; }
+.bridge-badge i { width: 8px; height: 8px; border-radius: 50%; background: var(--cqa-brand-action); box-shadow: 0 0 0 3px rgba(0, 200, 100, .22); }
+.bridge-badge[hidden] { display: none; }
+.ds-pill { font-family: var(--cqa-font-sans); letter-spacing: 0; }
+.ds-pill .mono { font-family: var(--cqa-font-mono); }
+.rb-action .btn-primary { background: var(--cqa-brand-action); color: #03130A; }
+.rb-action .btn-primary:hover:not(:disabled) { background: #00B058; }
+
+/* Dynamics 365 host: navy product bar + clickable CRM site map rail (this is the app navigation) */
+.cqa-host-on .cqa-frame { grid-template-columns: 84px minmax(0, 1fr); grid-template-rows: 44px minmax(0, 1fr); background: var(--cqa-bg-canvas); }
+.cqa-host-on .cqa-d365-top { background: var(--cqa-d365-bar); font-size: 14px; }
+.cqa-d365-top .prod { font-weight: 600; letter-spacing: .01em; }
+.cqa-host-on .cqa-d365-rail { background: var(--cqa-bg-surface); border-right: 1px solid var(--cqa-border-hairline); padding: 8px 6px; gap: 2px; overflow-y: auto; }
+.cqa-d365-rail a {
+  position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 2px 8px; border-radius: var(--cqa-radius-sm); color: var(--cqa-text-secondary);
+  font-size: 11.5px; font-weight: 600; line-height: 1.15; text-align: center; transition: background .12s, color .12s; hyphens: none; word-break: keep-all;
+}
+.cqa-d365-rail a:hover { color: var(--cqa-brand-primary); background: var(--cqa-bg-elevated); }
+.cqa-d365-rail a.active { color: var(--cqa-brand-primary); background: var(--cqa-brand-soft); }
+.cqa-d365-rail a.active::before { content: ""; position: absolute; left: -6px; top: 10px; bottom: 10px; width: 3px; border-radius: 0 2px 2px 0; background: var(--cqa-brand-primary); }
+.cqa-d365-rail a:focus-visible { outline: 2px solid var(--cqa-brand-primary); outline-offset: 1px; }
+.cqa-d365-rail .badge { position: absolute; top: 5px; right: 12px; min-width: 16px; height: 16px; padding: 0 4px; border-radius: 8px; background: var(--cqa-critical-accent); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; font-family: var(--cqa-font-mono); }
+.cqa-host-on .cqa-app { margin: 0; border: 0; border-radius: 0; box-shadow: none; }
+
+/* page title lives in a white card on every page */
+.page { padding: 14px 18px 32px; }
+.page-head { background: var(--cqa-bg-surface); border: 1px solid var(--cqa-border-hairline); border-radius: var(--cqa-radius); padding: 14px 18px; margin-bottom: 12px; min-height: 64px; }
+.page-head h1 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--cqa-text-primary); }
+.page-head .sub { font-size: 13px; color: var(--cqa-text-muted); margin-top: 2px; }
+.page.fill .page-head { min-height: 0; padding: 10px 14px; }
+.page.fill .page-head h1 { font-size: 18px; }
+.cqa-host-on .page.fill { height: calc(100vh - var(--cqa-chrome)); }
+
+/* telemetry strip: centered, generous numbers */
+.tcell { align-items: center; text-align: center; padding: 14px 12px 12px; gap: 6px; }
+.tcell .lbl { justify-content: center; font-size: 13px; color: var(--cqa-text-primary); font-weight: 600; }
+.tcell .lbl .ic { color: var(--cqa-text-muted); }
+.tcell .val { font-size: 28px; }
+.tcell .foot { justify-content: center; font-size: 12px; white-space: normal; text-align: center; line-height: 1.35; }
+.tcell .val { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.cchart tspan.na { fill: var(--cqa-text-muted); font-weight: 500; }
+.tcell svg.spark { width: 100%; max-width: 200px; height: 6px; margin: 2px auto 0; }
+.tcell .stack-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; font-size: 12px; color: var(--cqa-text-muted); }
+
+/* criteria chart and triage, as in the mockup */
+.cchart .ok { fill: var(--cqa-bar-good); }
+.cchart .fail { fill: var(--cqa-bar-low); }
+.cchart .trk { fill: #E8EDEA; }
+.legend-inline i.ok { background: var(--cqa-bar-good); }
+.legend-inline i.fail { background: var(--cqa-bar-low); }
+.v3-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 12px; }
+.tri-list { display: flex; flex-direction: column; }
+.tri-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; gap: 12px; align-items: center; padding: 10px 2px; border-top: 1px solid var(--cqa-border-hairline); }
+.tri-row:first-child { border-top: 0; }
+.tri-row .main { min-width: 0; }
+.tri-row .line { display: flex; align-items: center; gap: 8px; font-size: 13.5px; white-space: nowrap; overflow: hidden; }
+.tri-row .line .id { font-family: var(--cqa-font-mono); font-weight: 700; }
+.tri-row .line .sep { color: var(--cqa-border-strong); }
+.tri-row .line .meta { color: var(--cqa-text-secondary); }
+.tri-row .why { font-size: 12px; color: var(--cqa-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.tri-row .score { font-size: 15px; }
+.tri-row .go { color: var(--cqa-brand-primary); font-weight: 700; font-size: 13px; white-space: nowrap; padding: 4px 8px; border-radius: var(--cqa-radius-sm); }
+.tri-row .go:hover { background: var(--cqa-brand-soft); }
+.flag08 { display: inline-flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border-radius: 3px; font-family: var(--cqa-font-mono); font-size: 12px; font-weight: 700; background: var(--cqa-warn-bg); color: var(--cqa-fail-text); border: 1px solid var(--cqa-warn-border); white-space: nowrap; }
+.flag08 .ic { color: #F59E0B; }
+.flag08.soft { color: var(--cqa-warn-text); }
+
+/* gross error banner: calm corporate red instead of a dark block */
+.gross-banner { background: var(--cqa-fail-bg); border: 1px solid var(--cqa-fail-border); border-left: 4px solid var(--cqa-critical-accent); color: var(--cqa-fail-text); }
+.gross-banner span { color: var(--cqa-text-secondary); }
+.gross-banner .btn { background: var(--cqa-bg-surface); border-color: var(--cqa-fail-border); color: var(--cqa-fail-text); }
+.gross-banner .btn:hover { background: var(--cqa-fail-bg); color: var(--cqa-fail-text); border-color: var(--cqa-critical-accent); }
+
+/* softer dark blocks elsewhere */
+.chip.on { background: var(--cqa-brand-soft); border-color: var(--cqa-brand-primary); color: var(--cqa-brand-primary); }
+.chip.on.danger { background: var(--cqa-fail-bg); border-color: var(--cqa-critical-accent); color: var(--cqa-fail-text); }
+.appeal-row .code-badge { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); border: 1px solid var(--cqa-brand-border); }
+.review-modal .rm-head { background: var(--cqa-header); }
+.total-card { background: var(--cqa-bg-surface); }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1180px) {
   .tstrip { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .tcell:nth-child(4) { border-left: 0; }
   .tcell:nth-child(n+4) { border-top: 1px solid var(--cqa-border-hairline); }
   .two-one, .builder, .engines { grid-template-columns: 1fr; }
+  .v3-split { grid-template-columns: 1fr; }
+  .rb-title { display: none; }
   .builder-side { position: static; }
   .review { grid-template-columns: minmax(0, 1fr) 380px; }
   .rb-tabs a .ic { display: none; }
@@ -707,6 +813,11 @@ p { margin: 0; }
   :scope.cqa-host-on .cqa-app { margin: 0; border: 0; box-shadow: none; overflow: visible; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
+  .rb-title, .bridge-badge, .theme-toggle { display: none !important; }
+  .page-head { padding: 12px 14px; min-height: 0; }
+  .v3-split { grid-template-columns: 1fr; }
+  .tri-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+  .tri-row .flag08 { display: none; }
   .page-head .eval-main { display: inline-flex; }
   :scope.no-data { padding-bottom: 0; }
   .rb-right { margin-left: auto; }

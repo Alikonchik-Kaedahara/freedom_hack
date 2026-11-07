@@ -175,7 +175,8 @@ export function renderDialog(root, cid) {
     scoreTabLabel.textContent = `Оценка · ${fmtScore(sc.total)}`;
 
     const sections = Object.entries(sc.sections);
-    const total = h('div', { class: 'total-card' },
+    // Provenance (checklist version, model, cost, prompt hash) stays available on hover, not on screen.
+    const total = h('div', { class: 'total-card', title: provenanceText(res) },
       h('div', { class: 'lbl' }, 'Итоговый балл'),
       h('div', { class: `val ${scoreClass(sc.total)}` }, fmtScore(sc.total), h('small', null, ' / 100')),
       orig.total !== sc.total ? h('div', { class: 'was' }, 'До апелляции ', h('s', null, fmtScore(orig.total))) : null,
@@ -183,9 +184,7 @@ export function renderDialog(root, cid) {
         h('div', { class: 'section-row' },
           h('span', { class: 'n' }, name),
           h('div', { class: 'bar' }, h('i', { style: { width: `${s.pct ?? 0}%` } })),
-          h('span', { class: 'p' }, s.pct == null ? 'N/A' : `${Math.round(s.pct)}%`)))) : null,
-      h('div', { class: 'total-meta' }, `Чек-лист «${res.checklist.name}», версия ${res.checklist.version} · ${fmtDate(res.createdAt)}`),
-      provenanceLine(res));
+          h('span', { class: 'p' }, s.pct == null ? 'N/A' : `${Math.round(s.pct)}%`)))) : null);
 
     const groups = [];
     let lastSec = null;
@@ -244,14 +243,14 @@ export function renderDialog(root, cid) {
       body);
   }
 
-  function provenanceLine(res) {
-    const parts = [];
+  function provenanceText(res) {
+    const parts = [`Чек-лист «${res.checklist.name}», версия ${res.checklist.version} · ${fmtDate(res.createdAt)}`];
     if (res.engine?.type === 'replay') parts.push('replay — сохранённый ответ, без вызова модели');
     else if (res.engine?.model) parts.push(`модель ${res.engine.model}`);
     if (res.attempts > 1) parts.push(`${res.attempts} попытки: ответ исправлялся после проверки`);
     if (res.usage?.costUsd) parts.push(`$${res.usage.costUsd.toFixed(3)}`);
     if (res.promptHash) parts.push(`промпт ${res.promptHash}`);
-    return parts.length ? h('div', { class: 'total-meta' }, parts.join(' · ')) : null;
+    return parts.join('\n');
   }
 
   // Base weight from the checklist, the weight after N/A redistribution, and the points earned.
