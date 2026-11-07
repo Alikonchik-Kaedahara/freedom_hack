@@ -51,16 +51,16 @@ function build() {
   const pct = recs.length ? evaluated.length / recs.length : 0;
   const usage = costInfo(evaluated);
   const strip = h('div', { class: 'card tstrip' },
-    cell('Средний балл', h('span', { class: `val ${avg == null ? '' : ''}` }, h('span', { class: `score ${scoreClass(avg)}` }, fmtScore(avg)), h('small', null, '/ 100')),
+    cell('Средний балл', h('span', { class: 'val' }, h('span', { class: `score ${scoreClass(avg)}` }, fmtScore(avg)), h('small', null, '/ 100')),
       avg == null ? 'нет оценок' : h('span', { class: `target ${avg >= TARGET ? 'up' : 'down'}` }, `${avg >= TARGET ? '▲' : '▼'} цель ${TARGET}`)),
     cell('Проверено диалогов', h('span', { class: 'val' }, evaluated.length, h('small', null, `из ${recs.length}`)),
-      [progressSvg(pct), h('span', null, `${chats} ${pluralRu(chats, 'чат', 'чата', 'чатов')} · ${calls} ${pluralRu(calls, 'звонок', 'звонка', 'звонков')}`)], { stack: true }),
-    cell(['Грубые ошибки', h('span', { class: 'mono' }, '· Крит. 08')], h('span', { class: 'val' }, gross),
-      gross ? `${gross} ${pluralRu(gross, 'диалог', 'диалога', 'диалогов')} · нулевая терпимость` : 'не выявлено', { cls: gross ? 'danger' : 'ok', icon: 'shield' }),
-    cell('Апелляции', h('span', { class: 'val' }, pending, h('small', null, `/ ${resolved} решено`)),
-      pending ? 'ждут решения проверяющего' : 'новых нет', { icon: 'scale' }),
+      h('div', { class: 'stack-foot' }, progressSvg(pct), h('span', null, `${chats} ${pluralRu(chats, 'чат', 'чата', 'чатов')} · ${calls} ${pluralRu(calls, 'звонок', 'звонка', 'звонков')}`)), { stack: true }),
+    cell(['Грубые ошибки', h('span', { class: 'mono' }, ' · Крит. 08')], h('span', { class: 'val' }, gross),
+      gross ? `${gross} ${pluralRu(gross, 'диалог', 'диалога', 'диалогов')} · нулевая терпимость` : 'не выявлено', { cls: gross ? 'danger' : 'ok' }),
+    cell('Апелляции', h('span', { class: 'val', style: { color: pending ? 'var(--cqa-warn-text)' : 'var(--cqa-text-muted)' } }, `${pending} / ${resolved}`),
+      pending ? `ждут решения · решено ${resolved}` : 'решено, новых нет'),
     cell('Расход токенов / Модель', h('span', { class: 'val' }, usage.perDialog != null ? `$${usage.perDialog.toFixed(3)}` : '—', h('small', null, 'за диалог')),
-      usage.model ? `${usage.model} · всего $${usage.total.toFixed(2)} · ${fmtTokens(usage.tokens)}` : modelName(), { icon: 'cpu' }));
+      usage.model ? `${usage.model} — всего $${usage.total.toFixed(2)} · ${fmtTokens(usage.tokens)}` : modelName()));
 
   if (!evaluated.length) {
     const first5 = pendingIds.slice(0, 5);
@@ -75,7 +75,7 @@ function build() {
   }
 
   return h('div', { class: 'page' }, head, strip,
-    h('div', { class: 'grid two-one', style: { marginTop: '12px' } }, criteriaCard(evaluated), triageCard(evaluated)));
+    h('div', { class: 'v3-split' }, criteriaCard(evaluated), triageCard(evaluated)));
 }
 
 function cell(label, value, foot, opts = {}) {
@@ -133,30 +133,29 @@ function criteriaCard(evaluated) {
   const rows = [...agg.values()].sort((a, b) => String(a.code).localeCompare(String(b.code)));
   // Phones get a narrower viewBox so the text stays readable instead of shrinking with the SVG.
   const narrow = window.matchMedia('(max-width: 820px)').matches;
-  const W = narrow ? 340 : 560, rowH = 30, labelW = narrow ? 168 : 230, barW = narrow ? 120 : 230, maxName = narrow ? 18 : 30;
+  const W = narrow ? 340 : 600, rowH = 32, labelW = narrow ? 168 : 250, barW = narrow ? 120 : 240, maxName = narrow ? 18 : 32;
   const H = rows.length * rowH + 4;
   const chart = svg('svg', { class: 'cchart', viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': 'Выполнение критериев' },
     rows.map((a, i) => {
       const y = i * rowH + 4;
       const pct = a.n ? a.sum / a.n : null;
-      const tone = pct == null ? 'none' : pct >= 0.85 ? 'ok' : pct >= 0.65 ? 'part' : 'fail';
+      const tone = pct == null ? 'none' : pct >= 0.7 ? 'ok' : 'fail';
       const name = a.name.length > maxName ? `${a.name.slice(0, maxName - 1)}…` : a.name;
       return svg('g', null,
         svg('text', { class: 'code', x: 0, y: y + 15 }, a.code),
         svg('text', { x: 28, y: y + 15 }, svg('title', null, a.name), name),
         svg('rect', { class: 'trk', x: labelW, y: y + 5, width: barW, height: 12, rx: 2 }),
         pct != null ? svg('rect', { class: tone, x: labelW, y: y + 5, width: Math.max(2, barW * pct), height: 12, rx: 2 }) : null,
-        svg('text', { class: 'pct', x: labelW + barW + 10, y: y + 15 }, pct == null ? '—' : `${Math.round(pct * 100)}%`),
-        a.na && !narrow ? svg('text', { class: 'na', x: W - 2, y: y + 15, 'text-anchor': 'end' }, `N/A ${a.na}`) : null);
+        svg('text', { class: 'pct', x: labelW + barW + 10, y: y + 15 }, pct == null ? '—' : `${Math.round(pct * 100)}%`, !narrow && a.na ? svg('tspan', { class: 'na' }, `, N/A ${a.na}`) : null),
+        null);
     }));
   return h('div', { class: 'card card-pad' },
     h('h3', { class: 'card-title' }, 'Выполнение критериев 01–07', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, `по ${evaluated.length} ${pluralRu(evaluated.length, 'диалогу', 'диалогам', 'диалогам')}`)),
     chart,
     h('div', { class: 'legend-inline' },
-      h('span', null, h('i', { class: 'ok' }), '≥ 85%'),
-      h('span', null, h('i', { class: 'part' }), '65–84%'),
-      h('span', null, h('i', { class: 'fail' }), '< 65%'),
-      h('span', null, 'N/A — сколько раз критерий был неприменим')),
+      h('span', null, h('i', { class: 'ok' }), 'Выполняется (≥ 70%)'),
+      h('span', null, h('i', { class: 'fail' }), 'Проблемная зона (< 70%)'),
+      h('span', null, 'N/A — критерий неприменим')),
     segments(evaluated));
 }
 
@@ -186,16 +185,18 @@ function triageCard(evaluated) {
     return { r, s, kind, why, rank: { gross: 0, appeal: 1, disputed: 2, low: 3 }[kind] * 1000 + (s.total ?? 0) };
   }).sort((a, b) => a.rank - b.rank).slice(0, 8);
 
-  const tagFor = (k) => (k === 'gross' ? h('span', { class: 'tag red' }, icon('shield', 12), '08')
-    : k === 'appeal' ? h('span', { class: 'tag amber' }, icon('scale', 12)) : k === 'disputed' ? h('span', { class: 'tag amber' }, icon('alert', 12)) : h('span', { class: 'tag' }, '↓'));
-
   return h('div', { class: 'card card-pad' },
-    h('h3', { class: 'card-title' }, 'Приоритетный разбор', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, 'грубые ошибки и низкие баллы')),
-    h('table', { class: 'triage' }, h('tbody', null, items.map(({ r, s, kind, why }) =>
-      h('tr', null,
-        h('td', null, tagFor(kind)),
-        h('td', null, h('div', { class: 'id' }, r.conversation_id), h('div', { class: 'why', title: why }, why)),
-        h('td', null, h('span', { class: 'muted' }, `${channelLabel(r.channel)} · ${r.language}`)),
-        h('td', null, h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total))),
-        h('td', null, h('a', { class: 'btn btn-secondary btn-xs', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Разбор →')))))));
+    h('h3', { class: 'card-title' }, 'Приоритетный разбор', h('span', { class: 'spacer' }), h('span', { class: 'hint' }, 'требуют внимания')),
+    h('div', { class: 'tri-list' }, items.map(({ r, s, kind, why }) =>
+      h('div', { class: 'tri-row' },
+        h('div', { class: 'main' },
+          h('div', { class: 'line' }, h('span', { class: 'id' }, r.conversation_id), h('span', { class: 'sep' }, '|'),
+            h('span', { class: 'meta' }, `${channelLabel(r.channel)} · ${r.language}`)),
+          h('div', { class: 'why', title: why }, why)),
+        h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total)),
+        h('a', { class: 'go', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Разбор →'),
+        kind === 'gross' ? h('span', { class: 'flag08', title: 'Грубая ошибка, критерий 08' }, icon('alert', 13), '08')
+          : kind === 'appeal' ? h('span', { class: 'flag08 soft', title: 'Апелляция ждёт решения' }, icon('scale', 13))
+            : kind === 'disputed' ? h('span', { class: 'flag08 soft', title: 'Спорный критерий' }, icon('alert', 13), '?')
+              : h('span')))));
 }

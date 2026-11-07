@@ -15,11 +15,11 @@ import { renderChecklists } from './views/checklists.js';
 import { renderModel } from './views/model.js';
 
 const NAV = [
-  { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid' },
-  { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list' },
-  { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', badge: () => pendingAppeals().length },
-  { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks' },
-  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu' },
+  { path: '/', label: 'Обзор', short: 'Обзор', icon: 'grid', rail: 'home' },
+  { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list', rail: 'clockR' },
+  { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', rail: 'bookmark', badge: () => pendingAppeals().length },
+  { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks', rail: 'headset' },
+  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu', rail: 'gear' },
 ];
 
 const ROUTES = [
@@ -32,7 +32,6 @@ const ROUTES = [
 ];
 
 const HOST_KEY = 'cqa.hostPreview';
-const THEME_KEY = 'cqa.theme';
 const ui = {};
 let cleanup = null;
 let currentPath = null;
@@ -52,10 +51,10 @@ function buildShell(root) {
   ui.pill = h('button', { class: 'ds-pill', type: 'button', 'aria-haspopup': 'dialog' });
   ui.host = h('button', { class: 'host-toggle', type: 'button', title: 'Показать, как компонент выглядит внутри Dynamics 365' },
     icon('waffle', 15), h('span', { class: 'lbl' }, 'D365 Host'));
-  ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая CRM / тёмный терминал' }, icon('contrast', 15), h('span', { class: 'lbl' }, 'Тема'));
   ui.action = h('div', { class: 'rb-action' });
-  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.host, ui.theme, ui.action);
-  ui.bridge = h('span', { class: 'bridge' });
+  ui.bridge = h('span', { class: 'bridge-badge', hidden: true });
+  ui.right = h('div', { class: 'rb-right' }, ui.bridge, ui.pill, ui.host, ui.action);
+  ui.rail = h('nav', { class: 'cqa-d365-rail', 'aria-label': 'Разделы CQA' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
 
@@ -63,38 +62,27 @@ function buildShell(root) {
     h('a', { class: 'rb-brand', href: '#/' },
       h('img', { src: assetUrl('assets/logo.svg'), alt: '' }),
       h('span', { class: 'word' }, h('b', null, 'FREEDOM'), h('small', null, 'BROKER')),
-      h('span', { class: 'rb-badge' }, 'CQA TERMINAL')),
+      h('span', { class: 'rb-title' }, 'Conversation Quality Analytics')),
     ui.tabs, ui.right);
 
   const d365Top = h('div', { class: 'cqa-d365-top' },
     h('span', { class: 'waffle' }, Array.from({ length: 9 }, () => h('i'))),
     h('span', { class: 'prod' }, 'Dynamics 365'), h('span', { class: 'sep' }),
     h('span', { class: 'app' }, 'Freedom Broker — Омниканальный контроль качества'),
-    ui.bridge, h('span', { class: 'avatar' }, 'FB'));
-  const d365Rail = h('div', { class: 'cqa-d365-rail' },
-    h('span', null, icon('home', 18)), h('span', null, icon('clockR', 18)), h('span', null, icon('pin', 18)),
-    h('span', null, icon('headset', 18)), h('span', { class: 'on' }, icon('checks', 18)));
+    h('span', { class: 'avatar', style: { marginLeft: 'auto' } }, 'FB'));
 
   const layer = h('div', { class: 'cqa-layer' });
   const modal = h('div'); const toasts = h('div', { class: 'cqa-toasts' }); const dock = h('div', { class: 'cqa-dock' });
   layer.append(modal, toasts, dock);
   setLayers({ modal, toasts, dock });
 
-  root.replaceChildren(h('div', { class: 'cqa-frame' }, d365Top, d365Rail, h('div', { class: 'cqa-app' }, ribbon, ui.view)), ui.tabbar, layer);
+  root.replaceChildren(h('div', { class: 'cqa-frame' }, d365Top, ui.rail, h('div', { class: 'cqa-app' }, ribbon, ui.view)), ui.tabbar, layer);
 
   ui.pill.addEventListener('click', (e) => { e.stopPropagation(); openDatasetPopover(ui.right); });
   ui.host.addEventListener('click', () => setHostPreview(!root.classList.contains('cqa-host-on')));
-  ui.theme.addEventListener('click', () => setTheme(root.dataset.theme === 'dark' ? 'light' : 'dark'));
-  setTheme(readPref(THEME_KEY) === 'dark' ? 'dark' : 'light', false);
-  if (D365Bridge.ready) ui.host.hidden = true; // already inside Dynamics 365
-  else setHostPreview(readPref(HOST_KEY) === '1', false);
-}
-
-function setTheme(theme, persist = true) {
-  ui.root.dataset.theme = theme;
-  ui.theme.setAttribute('aria-pressed', String(theme === 'dark'));
-  if (persist) writePref(THEME_KEY, theme);
-  // SVG pieces read their colors from CSS tokens, so only views with cached layout need a redraw.
+  root.dataset.theme = 'light';
+  if (D365Bridge.ready) { ui.host.hidden = true; updateBridge(); } // already inside Dynamics 365
+  else setHostPreview(readPref(HOST_KEY) !== '0', false); // the Dynamics 365 frame is the default look
 }
 
 function setHostPreview(on, persist = true) {
@@ -102,10 +90,16 @@ function setHostPreview(on, persist = true) {
   ui.host.classList.toggle('on', on);
   ui.host.setAttribute('aria-pressed', String(on));
   if (persist) writePref(HOST_KEY, on ? '1' : '0');
-  const ready = D365Bridge.ready;
-  ui.bridge.className = `bridge ${ready ? 'ok' : 'wait'}`;
-  // Shows "Connected" only with a real Xrm object; the standalone preview says so honestly.
-  ui.bridge.replaceChildren(h('i'), ready ? 'Xrm.Page Bridge: Connected' : 'Xrm.Page Bridge · демо, Xrm не найден');
+  if (on) D365Bridge.connectEmulatedHost(); else D365Bridge.disconnectEmulatedHost();
+  updateBridge();
+}
+
+function updateBridge() {
+  ui.bridge.hidden = !D365Bridge.ready;
+  ui.bridge.title = D365Bridge.simulated
+    ? 'Предпросмотр: страница эмулирует хост Dynamics 365 (Xrm), мост подключён к нему. Внутри CRM подключается к настоящему Xrm.'
+    : 'Подключено к Xrm Dynamics 365';
+  ui.bridge.replaceChildren(h('i'), 'Xrm Bridge: Активен (Dynamics 365 Host)');
 }
 
 function renderChrome() {
@@ -115,6 +109,11 @@ function renderChrome() {
     return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
       icon(item.icon, 16), item.label, badge ? h('span', { class: 'badge' }, badge) : null);
   }));
+  ui.rail.replaceChildren(...NAV.map((item) => {
+    const badge = item.badge ? item.badge() : 0;
+    return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '', title: item.label },
+      icon(item.rail || item.icon, 20), h('span', null, item.short), badge ? h('span', { class: 'badge' }, badge) : null);
+  }));
   ui.tabbar.replaceChildren(...NAV.map((item) => {
     const badge = item.badge ? item.badge() : 0;
     return h('a', { href: `#${item.path}`, class: isActive(item, path) ? 'active' : '' },
@@ -122,7 +121,7 @@ function renderChrome() {
       h('span', { class: 'tab-label' }, item.short));
   }));
   const ds = state.datasets.find((d) => d.groupId === state.group);
-  ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'GROUP:'), h('span', null, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
+  ui.pill.replaceChildren(icon('database', 14), h('span', { class: 'k' }, 'Набор:'), h('span', { class: 'mono' }, ds ? `${ds.groupId} · ${ds.total}` : '—'), icon('chevron', 13));
   ui.root.classList.toggle('no-data', !state.group);
 }
 
