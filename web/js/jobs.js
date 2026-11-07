@@ -1,7 +1,7 @@
 // Evaluation jobs: start, poll, show progress in the dock.
 import { api } from './api.js';
 import { state, emit, refreshResults } from './store.js';
-import { h, toast, clear, pluralRu, layer } from './ui.js';
+import { h, toast, clear, pluralRu, layer, openModal } from './ui.js';
 
 let timer = null;
 
@@ -43,6 +43,20 @@ export async function startSecondOpinion(ids, engine) {
       action: e.status === 412 ? { label: 'Настроить', onClick: () => (location.hash = '#/settings/model') } : null,
     });
   }
+}
+
+/** Ask before a second opinion: it re-runs the evaluation and costs as much as the first one. */
+export function confirmSecondOpinion(ids) {
+  if (!ids.length) return;
+  const n = ids.length;
+  const m = openModal({
+    title: 'Второе мнение',
+    sub: `Система ещё раз оценит ${n} ${pluralRu(n, 'диалог', 'диалога', 'диалогов')} независимо от первой оценки. Критерии, где ответы разойдутся, станут спорными.`,
+    footer: [
+      h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); startSecondOpinion(ids); } }, 'Запустить'),
+    ],
+  });
 }
 
 export async function resumeJobs() {

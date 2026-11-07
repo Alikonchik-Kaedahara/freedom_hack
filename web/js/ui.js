@@ -148,3 +148,26 @@ export function clearHashQuery() {
   const i = location.hash.indexOf('?');
   if (i >= 0) history.replaceState(null, '', location.hash.slice(0, i));
 }
+
+/**
+ * «⋯» button with a small dropdown of rare actions.
+ * items: [{ label, onClick } | { label, href, download?, target? } | null]
+ */
+export function moreMenu(items, { label = 'Ещё действия' } = {}) {
+  const wrap = h('div', { class: 'more-wrap' });
+  const btn = h('button', { class: 'btn btn-secondary btn-icon', type: 'button', 'aria-label': label, title: label, 'aria-haspopup': 'menu' }, icon('more', 18));
+  const close = () => { wrap.querySelector('.pop-menu')?.remove(); btn.setAttribute('aria-expanded', 'false'); document.removeEventListener('click', close); };
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    if (wrap.querySelector('.pop-menu')) { close(); return; }
+    const menu = h('div', { class: 'pop-menu', role: 'menu' }, items.filter(Boolean).map((it) => (it.href
+      ? h('a', { role: 'menuitem', href: it.href, download: it.download || null, target: it.target || null, rel: it.target ? 'noopener' : null, onclick: close }, it.label)
+      : h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); it.onClick(); } }, it.label))));
+    menu.addEventListener('click', (ev) => ev.stopPropagation());
+    wrap.append(menu);
+    btn.setAttribute('aria-expanded', 'true');
+    setTimeout(() => document.addEventListener('click', close), 0);
+  });
+  wrap.append(btn);
+  return wrap;
+}
