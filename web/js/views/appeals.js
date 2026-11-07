@@ -1,4 +1,4 @@
-// Апелляции: the queue and the decision. Who filed and who decided is recorded (Settings → Пользователь).
+// Апелляции: the queue and the decision. The header profile supplies the names of the author and reviewer.
 import { h, icon, fmtScore, openModal, toast, fmtDate, pluralRu } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, allAppeals, putResult } from '../store.js';

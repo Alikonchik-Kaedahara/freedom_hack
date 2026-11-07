@@ -485,3 +485,49 @@ def test_check_catches_wrong_total_and_missing_evidence():
     assert export.check(doc) == []
     rows[7]["evidence_turns"] = []
     assert any("evidence_turns пустой" in p for p in export.check(doc))
+
+
+@pytest.mark.parametrize("engine", ["cloud", "local"])
+def test_reviewer_coaching_is_an_editable_draft_separate_from_scoring(client, monkeypatch, engine):
+    from cqa import export
+    fake_cloud(monkeypatch)
+    evaluated_sample(client)
+    key = "SAMPLE:sample-ru-002"
+    result = storage.get_result(key)
+    row = storage.get_record("SAMPLE", "sample-ru-002")
+    path = f"/api/results/{key}/coaching/c5"
+    turn = next(i for i, t in enumerate(row["transcript"], 1) if t["speaker"] == "operator")
+    body = {"by": "Проверяющий", "turn": turn, "quote": row["transcript"][turn - 1]["text"],
+            "version": result["reviewVersion"], "verdict": result["answers"]["c5"]["answer"]}
+    before, _ = export.build("SAMPLE", "Команда")
+
+    def draft(settings, system, messages, schema):
+        prompt = json.loads(messages[0]["content"])
+        assert prompt["selectedTurn"] == turn and len(prompt["context"]) <= 5
+        assert body["quote"] in [m["text"] for m in prompt["context"]]
+        return json.dumps({"text": "Пример черновика"}), {"costUsd": 0}, {"model": "test-model"}
+
+    monkeypatch.setattr(evaluator, "_call_" + engine, draft)
+    client.put("/api/settings", json={"engine": "replay"})
+    suggested = client.post(path, json={**body, "engine": engine})
+    assert suggested.status_code == 200 and suggested.get_json()["text"] == "Пример черновика"
+    assert storage.get_result(key) == result
+    assert client.post(path, json={**body, "engine": "replay"}).status_code == 400
+    assert client.put(path, json={**body, "text": ""}).status_code == 400
+    assert client.put(path, json={**body, "text": "Совет", "turn": 1000}).status_code == 404
+    assert client.put(path, json={**body, "text": "Совет", "quote": "Чужая реплика"}).status_code == 409
+    edited = {**body, "text": "Сначала уточните вопрос клиента."}
+    saved = client.put(path, json=edited).get_json()
+    note = saved["coaching"]["c5"]
+    assert note["by"] == body["by"] and note["text"] == edited["text"] and note["quote"] == body["quote"]
+    assert client.put(path, json=edited).get_json()["coaching"] == saved["coaching"]
+    assert client.put(path, json={**body, "text": "Перезаписать"}).status_code == 409
+    assert client.put(path, json={**edited, "version": "stale"}).status_code == 409
+    latest = client.put(path, json={**edited, "text": "Отредактированный совет", "previousId": note["id"]})
+    assert latest.status_code == 200
+    for field in ("score", "answers", "appeals", "reviewVersion"):
+        assert latest.get_json()[field] == result[field]
+    assert storage.get_record("SAMPLE", "sample-ru-002") == row
+    assert export.build("SAMPLE", "Команда")[0] == before
+    printed = client.get("/report/SAMPLE/sample-ru-002").get_data(as_text=True)
+    assert "Отредактированный совет" in printed and "Пример черновика" not in printed

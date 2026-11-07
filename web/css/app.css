@@ -974,10 +974,8 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .uc-avatar { width: 28px; height: 28px; border-radius: 50%; background: rgba(255, 255, 255, .16); color: #fff; display: grid; place-items: center; font-size: 11.5px; font-weight: 700; flex: none; }
 #cqa-d365-root .uc-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
 #cqa-d365-root .uc-text b { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 140px; }
-#cqa-d365-root .uc-text small { font-size: 11px; color: rgba(255, 255, 255, .65); white-space: nowrap; }
 #cqa-d365-root .user-menu { position: absolute; top: calc(100% + 6px); right: 0; z-index: 41; width: 220px; background: var(--cqa-bg-surface); color: var(--cqa-text-primary); border: 1px solid var(--cqa-border-strong); border-radius: 6px; padding: 6px; }
 #cqa-d365-root .user-menu .um-head { padding: 6px 8px 8px; border-bottom: 1px solid var(--cqa-border-hairline); margin-bottom: 4px; display: flex; flex-direction: column; }
-#cqa-d365-root .user-menu .um-head small { color: var(--cqa-text-muted); font-size: 12px; }
 #cqa-d365-root .user-menu button { display: block; width: 100%; text-align: left; border: 0; background: transparent; padding: 8px; border-radius: 4px; font-size: 13.5px; }
 #cqa-d365-root .user-menu button:hover { background: var(--cqa-bg-elevated); }
 #cqa-d365-root .cqa-d365-rail a { font-size: 11px; }
@@ -989,8 +987,6 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .settings-body > .page { padding: 0; }
 #cqa-d365-root .settings-body .page-head h1 { font-size: 17px; }
 #cqa-d365-root .settings-body .page-head { min-height: 0; }
-#cqa-d365-root .user-form { display: grid; grid-template-columns: auto minmax(0, 260px) minmax(0, 220px) auto; gap: 14px; align-items: end; }
-#cqa-d365-root .user-form .uc-avatar.big { width: 48px; height: 48px; font-size: 16px; background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
 #cqa-d365-root .export-choice { display: flex; gap: 8px; flex-wrap: wrap; }
 #cqa-d365-root .export-report { display: flex; flex-direction: column; gap: 8px; }
 #cqa-d365-root .export-report .btn { align-self: flex-start; }
@@ -1164,7 +1160,6 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .settings-tabs::-webkit-scrollbar { display: none; }
 #cqa-d365-root .settings-tabs a { flex: none; padding: 8px 10px; }
 #cqa-d365-root .settings-tabs a .ic { display: none; }
-#cqa-d365-root .user-form { grid-template-columns: 1fr; align-items: stretch; }
 #cqa-d365-root .rb-name { font-size: 13.5px; }
 #cqa-d365-root .user-card { padding: 0 2px; }
 #cqa-d365-root .theme-toggle { width: 34px; padding: 0; justify-content: center; }
@@ -1429,3 +1424,10 @@ from { transform: translateY(100%); }
 @media (max-width: 360px) {
 #cqa-d365-root .rb-name { display: none; }
 }
+#cqa-d365-root .coaching-editor { display: grid; gap: 10px; }
+#cqa-d365-root .coaching-editor .select { width: 100%; min-width: 0; }
+#cqa-d365-root .coaching-editor .review-quote { overflow-wrap: anywhere; }
+#cqa-d365-root .coaching-editor > .btn { justify-self: start; }
+#cqa-d365-root .coaching-note { border-left: 2px solid var(--cqa-border-strong); padding: 5px 10px; }
+#cqa-d365-root .coaching-note p { white-space: pre-wrap; overflow-wrap: anywhere; margin: 5px 0; }
+#cqa-d365-root .coaching-note small { display: block; color: var(--cqa-text-secondary); }

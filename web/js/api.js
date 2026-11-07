@@ -57,6 +57,8 @@ export const api = {
 
   results: (g) => req('GET', `/api/results?group=${e(g)}`),
   confirmReview: (key, body) => req('POST', `/api/results/${e(key)}/confirm`, body),
+  draftCoaching: (key, id, body) => req('POST', `/api/results/${e(key)}/coaching/${e(id)}`, body),
+  saveCoaching: (key, id, body) => req('PUT', `/api/results/${e(key)}/coaching/${e(id)}`, body),
   appeal: (key, body) => req('POST', `/api/results/${e(key)}/appeals`, body),
   decide: (key, id, body) => req('POST', `/api/results/${e(key)}/appeals/${e(id)}/decision`, body),
 

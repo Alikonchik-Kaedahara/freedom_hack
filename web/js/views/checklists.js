@@ -25,6 +25,10 @@ export function renderChecklists(root, id) {
 
   const page = h('div', { class: 'page' });
   root.append(page);
+  if (!draft) {
+    page.append(h('p', { class: 'muted' }, 'Не удалось загрузить чек-листы. Обновите страницу.'));
+    return;
+  }
   let saveBtn = null;
   const isValid = () => {
     const sum = round2(draft.criteria.filter((c) => c.type !== 'flag').reduce((a, c) => a + (Number(c.weight) || 0), 0));

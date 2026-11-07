@@ -24,7 +24,7 @@ import requests
 from flask import Flask, Response, abort, jsonify, request, send_file, send_from_directory
 
 from cqa import export, knowledge, operators, quality, replay, scoring, second, storage
-from cqa.evaluator import EvaluationError, check_engine, evaluate, local_relay_enabled
+from cqa.evaluator import EvaluationError, check_engine, evaluate, local_relay_enabled, suggest_coaching
 from cqa.validation import ValidationError, validate_checklist, validate_group_id, validate_records
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -296,6 +296,76 @@ def _person(value):
 
 def _review_version(result):
     return result.get("reviewVersion") or result.get("createdAt") or "legacy"
+
+
+@app.route("/api/results/<path:key>/coaching/<criterion_id>", methods=["POST", "PUT"])
+def coaching_note(key, criterion_id):
+    """POST prepares a private draft. Only PUT stores a reviewer's approved text."""
+    body = body_json() or {}
+    by = _person(body.get("by"))
+    turn = body.get("turn")
+    if not by or type(turn) is not int or not isinstance(body.get("quote"), str):
+        return bad("Укажите имя проверяющего и реплику.")
+    result = storage.get_result(key)
+    if not result:
+        return bad("Оценка не найдена", 404)
+    record = storage.get_record(result["groupId"], result["conversationId"])
+    if not record or not 1 <= turn <= len(record["transcript"]):
+        return bad("Реплика не найдена", 404)
+    source = record["transcript"][turn - 1]
+    if body["quote"] != source["text"]:
+        return bad("Транскрипт изменился. Откройте реплику заново.", 409)
+    criterion = next((c for c in result["checklist"]["criteria"] if c["id"] == criterion_id), None)
+    if not criterion:
+        return bad("Критерий не найден", 404)
+
+    def check_version(current):
+        answer = scoring.final_answers(current).get(criterion_id) or {}
+        if _review_version(current) != body.get("version") or answer.get("answer") != body.get("verdict"):
+            raise ValueError("Оценка изменилась. Откройте актуальную версию критерия.")
+        return answer
+
+    if request.method == "POST":
+        settings = storage.get_settings()
+        engine = body.get("engine")
+        if engine not in ("cloud", "local"):
+            return bad("Для черновика выберите облачную или локальную модель.")
+        if settings.get("engine") not in (engine, "replay"):
+            return bad("Настройки модели изменились. Обновите страницу.", 409)
+        try:
+            answer = check_version(result)
+        except ValueError as exc:
+            return bad(str(exc), 409)
+        try:
+            draft = suggest_coaching(record, criterion, answer, turn, settings, engine)
+            return jsonify(draft)
+        except EvaluationError as exc:
+            return bad(str(exc), 502)
+        except (ValueError, TypeError, KeyError):
+            return bad("Модель вернула ответ в неожиданном формате. Рекомендацию можно написать вручную.", 502)
+
+    text = body.get("text")
+    if not isinstance(text, str) or not 0 < len(text.strip()) <= 1200:
+        return bad("Напишите рекомендацию длиной от 1 до 1200 символов.")
+
+    def save(current):
+        check_version(current)
+        notes = current.setdefault("coaching", {})
+        old = notes.get(criterion_id) or {}
+        if (old.get("by"), old.get("text"), old.get("turn"), old.get("quote")) == (by, text.strip(), turn, source["text"]):
+            return current
+        if old.get("id") != body.get("previousId"):
+            raise ValueError("Другой проверяющий уже изменил рекомендацию. Откройте её заново.")
+        notes[criterion_id] = {"id": uuid.uuid4().hex, "text": text.strip(), "by": by, "at": now(),
+                               "turn": turn, "quote": source["text"], "speaker": source["speaker"],
+                               "version": _review_version(current)}
+        return current
+
+    try:
+        updated = storage.update_result(key, save)
+    except ValueError as exc:
+        return bad(str(exc), 409)
+    return jsonify(updated) if updated else bad("Оценка не найдена", 404)
 
 
 def _record_review(result, criterion_id, by, at, source):

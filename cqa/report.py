@@ -58,7 +58,7 @@ HTML_STYLE = """<style>
   tr.st-na td.verdict { color: #475569; }
   .q { border-left: 3px solid #cfd8d3; padding: 3px 8px; margin: 3px 0; font-size: 12px; }
   .qm { display: block; color: #777; font-size: 11px; }
-  .kb, .interp, .ap { font-size: 11.5px; margin-top: 5px; padding: 5px 8px; border-radius: 4px; }
+  .kb, .interp, .ap, .coaching { font-size: 11.5px; margin-top: 5px; padding: 5px 8px; border-radius: 4px; }
   .kb { background: #FFFBEB; border: 1px solid #FDE68A; }
   .interp { background: #F3F5F4; color: #333; }
   .ap { background: #EEF2F6; }
@@ -71,7 +71,7 @@ HTML_STYLE = """<style>
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 14px; }
   .actions a, .actions button { font: inherit; text-decoration: none; cursor: pointer; border: 1px solid #ccd6cf; border-radius: 4px; padding: 6px 12px; background: white; color: #164431; }
   .actions a { background: #14613f; color: white; }
-  .ap { white-space: pre-line; }
+  .ap, .coaching { white-space: pre-line; }
   @media print { .actions { display: none; } body { padding: 0; } }
 </style>"""
 
@@ -129,6 +129,10 @@ def content(record, result, team_name="", operator_name=""):
                 if dec.get("by"):
                     lines.append(f'Решил: {dec["by"]}')
             notes.append(("ap", f"Апелляция ({status})", "\n".join(lines)))
+        coaching = (result.get("coaching") or {}).get(cid)
+        if coaching:
+            notes.append(("coaching", "Рекомендация проверяющего",
+                          f'{coaching["text"]}\n{coaching["by"]} · {_fmt_date(coaching["at"])} · реплика №{coaching["turn"]}'))
         criteria.append({"code": c.get("code", ""), "name": c["name"], "section": c.get("section"),
                          "status": per["status"], "verdict": _verdict(c, a), "points": points,
                          "was": _verdict(c, result["answers"].get(cid)) if a.get("overridden") else None,

@@ -104,8 +104,8 @@ function renderUser() {
   const u = getUser();
   ui.user.replaceChildren(
     h('span', { class: 'uc-avatar' }, u ? initials(u.name) : icon('user', 14)),
-    h('span', { class: 'uc-text' }, h('b', null, u ? u.name : 'Представиться'), u ? h('small', null, u.role) : null));
-  ui.user.title = u ? `${u.name} · ${u.role}` : 'Укажите имя: оно попадёт в апелляции';
+    h('span', { class: 'uc-text' }, h('b', null, u ? u.name : 'Представиться')));
+  ui.user.title = u ? u.name : 'Укажите имя: оно попадёт в апелляции';
 }
 
 function openUserMenu() {
@@ -115,9 +115,9 @@ function openUserMenu() {
   if (!u) { askUser(); return; }
   const close = () => { menu.remove(); document.removeEventListener('click', close); };
   const menu = h('div', { class: 'user-menu', role: 'menu' },
-    h('div', { class: 'um-head' }, h('b', null, u.name), h('small', null, u.role)),
-    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); askUser({ title: 'Сменить пользователя' }); } }, 'Сменить пользователя'),
-    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); setUser(null); } }, 'Выйти'));
+    h('div', { class: 'um-head' }, h('b', null, u.name)),
+    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); askUser({ title: 'Изменить имя' }); } }, 'Изменить имя'),
+    h('button', { type: 'button', role: 'menuitem', onclick: () => { close(); setUser(null); } }, 'Очистить имя'));
   menu.addEventListener('click', (e) => e.stopPropagation());
   ui.right.append(menu);
   setTimeout(() => document.addEventListener('click', close), 0);
@@ -189,7 +189,12 @@ function setTitle(path) {
 }
 
 function route() {
-  const path = currentRoute();
+  let path = currentRoute();
+  if (path === '/settings/user') {
+    history.replaceState(null, '', '#/settings');
+    path = '/settings';
+    askUser({ title: 'Профиль' });
+  }
   for (const [re, to] of REDIRECTS) {
     const m = path.match(re);
     if (m) { location.replace(`#${to(m)}`); return; }

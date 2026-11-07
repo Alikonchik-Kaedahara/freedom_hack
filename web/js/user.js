@@ -1,21 +1,22 @@
-// The person working in the app: name and role, kept in this browser (localStorage "cqa.user").
+// The reviewer’s display name, kept in this browser (localStorage "cqa.user").
 // Shown in the header and written into appeals ("Подал") and decisions ("Решил").
 import { h, openModal } from './ui.js';
 
 const KEY = 'cqa.user';
-export const ROLES = ['Супервайзер', 'Аналитик качества', 'Руководитель'];
+let sessionUser = null;
 const listeners = new Set();
 
 export function getUser() {
   try {
     const u = JSON.parse(localStorage.getItem(KEY) || 'null');
-    return u && typeof u.name === 'string' && u.name.trim() ? { name: u.name.trim(), role: u.role || ROLES[0] } : null;
-  } catch { return null; }
+    return u && typeof u.name === 'string' && u.name.trim() ? { name: u.name.trim() } : null;
+  } catch { return sessionUser; }
 }
 
 export function setUser(user) {
+  sessionUser = user?.name?.trim() ? { name: user.name.trim() } : null;
   try {
-    if (user && user.name?.trim()) localStorage.setItem(KEY, JSON.stringify({ name: user.name.trim(), role: user.role || ROLES[0] }));
+    if (sessionUser) localStorage.setItem(KEY, JSON.stringify(sessionUser));
     else localStorage.removeItem(KEY);
   } catch { /* storage blocked: the name lives until reload */ }
   for (const fn of listeners) fn(getUser());
@@ -34,22 +35,21 @@ export function shortName(name) {
   return parts.length > 1 ? `${parts[0]} ${parts[1][0]}.` : (parts[0] || '');
 }
 
-/** Ask for name and role; resolves with the saved user or null if the dialog was closed. */
-export function askUser({ title = 'Представьтесь', sub = 'Имя и роль показываются в шапке и в апелляциях.' } = {}) {
+/** Ask for the reviewer’s name; resolves with the saved user or null if the dialog was closed. */
+export function askUser({ title = 'Представьтесь', sub = 'Это имя будет указано рядом с вашими решениями и рекомендациями.' } = {}) {
   return new Promise((resolve) => {
     const current = getUser();
-    const name = h('input', { class: 'input', value: current?.name || '', placeholder: 'Имя и фамилия', autocomplete: 'name' });
-    const role = h('select', { class: 'select' }, ROLES.map((r) => h('option', { value: r, selected: (current?.role || ROLES[0]) === r ? 'selected' : null }, r)));
+    const name = h('input', { class: 'input', value: current?.name || '', placeholder: 'Имя и фамилия', 'aria-label': 'Имя и фамилия', maxlength: 80, autocomplete: 'name' });
     let done = false;
     const save = h('button', { class: 'btn btn-primary', type: 'button' }, 'Сохранить');
     const m = openModal({
       title, sub,
-      body: [h('div', { class: 'field' }, h('label', null, 'Имя'), name), h('div', { class: 'field' }, h('label', null, 'Роль'), role)],
+      body: h('label', { class: 'field' }, 'Имя', name),
       footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'), save],
     });
     const finish = () => {
       if (!name.value.trim()) { name.focus(); return; }
-      setUser({ name: name.value, role: role.value });
+      setUser({ name: name.value });
       done = true;
       m.close();
       resolve(getUser());

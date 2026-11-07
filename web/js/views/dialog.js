@@ -9,6 +9,7 @@ import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
 import { openReview, byLine } from './appeals.js';
 import { requireUser } from '../user.js';
+import { coachingControl } from './coaching.js';
 
 const SPEAKER = { client: 'Клиент', operator: 'Оператор', bot: 'Бот', system: 'Система' };
 const openSets = new Map(); // conversation id -> Set of open criterion ids
@@ -343,6 +344,7 @@ export function renderDialog(root, cid) {
       outstanding && ev.length && msgEls[ev[0]] ? h('blockquote', { class: 'review-quote' }, rec.transcript[ev[0]].text) : null,
       appeals.map((a) => appealBox(res, c, a, origAns)),
       reviewActions(res, c, reviewed, outstanding, pending, ans),
+      coachingControl(rec, res, c, times),
       h('div', { class: 'crit-foot' },
         h('span', null, pointsText(c, p, sc)),
         !pending ? h('button', { class: 'link-btn', type: 'button', onclick: (e) => { e.stopPropagation(); openAppeal(res, c); } }, 'Подать апелляцию') : null)) : null;
