@@ -478,10 +478,17 @@ def prepare_demo():
     return restored
 
 
+@app.get("/healthz")
+def healthz():
+    return jsonify({"ok": True})
+
+
 if __name__ == "__main__":
+    # Local run. In hosting the app is served by gunicorn (see Procfile).
     if "--demo" in sys.argv:
         restored = prepare_demo()
         print("CQA demo: " + (f"снимок восстановлен ({', '.join(restored)})" if restored else "снимка нет, загружен demo/sample"))
     port = int(os.environ.get("PORT", 8000))
+    host = os.environ.get("HOST", "127.0.0.1")
     print(f"CQA: http://localhost:{port}")
-    app.run(host="127.0.0.1", port=port, threaded=True, debug=False)
+    app.run(host=host, port=port, threaded=True, debug=False)
