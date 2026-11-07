@@ -3,7 +3,7 @@ import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu } fr
 import { state, subscribe, summaryFor } from '../store.js';
 import { startEvaluation, isRunning } from '../jobs.js';
 
-const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, q: '' };
+const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, q: '' };
 const selected = new Set();
 
 export function renderDialogs(root) {
@@ -17,6 +17,7 @@ export function renderDialogs(root) {
     if (filters.channel.size && !filters.channel.has(r.channel)) return false;
     if (filters.gross && !s?.gross) return false;
     if (filters.appeal && !s?.pending) return false;
+    if (filters.disputed && !s?.disputed?.length) return false;
     if (filters.q && !r.conversation_id.toLowerCase().includes(filters.q.toLowerCase())) return false;
     return true;
   });
@@ -54,7 +55,8 @@ export function renderDialogs(root) {
         chip('Звонок', filters.channel.has('voice call'), toggleSet(filters.channel, 'voice call'), { icon: 'phone' }),
         h('span', { class: 'chip-sep' }),
         chip('Грубая ошибка', filters.gross, () => (filters.gross = !filters.gross), { icon: 'flag', danger: true }),
-        chip('Апелляция', filters.appeal, () => (filters.appeal = !filters.appeal), { icon: 'scale' })),
+        chip('Апелляция', filters.appeal, () => (filters.appeal = !filters.appeal), { icon: 'scale' }),
+        chip('Спорные', filters.disputed, () => (filters.disputed = !filters.disputed), { icon: 'alert' })),
       h('div', { class: 'search' }, icon('search', 16), search)));
   };
 
@@ -85,6 +87,7 @@ export function renderDialogs(root) {
     if (s?.gross) tags.push(h('span', { class: 'tag red' }, icon('flag', 14), 'Критично'));
     if (s?.pending) tags.push(h('span', { class: 'tag amber' }, icon('scale', 14), 'Апелляция'));
     else if (s?.changed) tags.push(h('span', { class: 'tag green' }, 'Пересмотрен'));
+    if (s?.disputed?.length) tags.push(h('span', { class: 'tag amber', title: 'Критерии с низкой уверенностью или непройденной проверкой' }, icon('alert', 14), `Спорно · ${s.disputed.length}`));
     const cb = h('input', {
       type: 'checkbox', class: 'cb', checked: selected.has(cid), 'aria-label': `Выбрать ${cid}`,
       onclick: (e) => { e.stopPropagation(); e.target.checked ? selected.add(cid) : selected.delete(cid); drawHead(); },

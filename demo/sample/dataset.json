@@ -1,0 +1,90 @@
+[
+  {
+    "conversation_id": "sample-ru-001",
+    "channel": "agent chat",
+    "language": "RU",
+    "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "bot", "text": "Здравствуйте! Я виртуальный помощник Freedom Broker. Опишите, пожалуйста, ваш вопрос."},
+      {"timestamp": "00:05", "speaker": "client", "text": "Здравствуйте, подскажите, какая комиссия за покупку акций на американском рынке?"},
+      {"timestamp": "00:40", "speaker": "system", "text": "Диалог передан оператору."},
+      {"timestamp": "00:55", "speaker": "operator", "text": "Здравствуйте! Меня зовут Айгерим, я специалист поддержки Freedom Broker. Уточните, пожалуйста, какой у вас тариф — «Единый» или «Трейдер»? От этого зависит размер комиссии."},
+      {"timestamp": "01:20", "speaker": "client", "text": "Тариф «Единый»."},
+      {"timestamp": "01:50", "speaker": "operator", "text": "На тарифе «Единый» комиссия за сделки с акциями США составляет 0,2% от суммы сделки, минимум 1,2 USD. Биржевой сбор и налоги считаются отдельно. Если планируете частые сделки, может быть выгоднее тариф «Трейдер» — могу рассказать подробнее."},
+      {"timestamp": "02:10", "speaker": "client", "text": "Нет, спасибо, пока достаточно."},
+      {"timestamp": "02:20", "speaker": "operator", "text": "Хорошо! Если появятся вопросы — пишите, будем рады помочь. Хорошего дня!"},
+      {"timestamp": "02:25", "speaker": "system", "text": "Чат закрыт оператором."}
+    ]
+  },
+  {
+    "conversation_id": "sample-ru-002",
+    "channel": "agent chat",
+    "language": "RU",
+    "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "bot", "text": "Здравствуйте! Я виртуальный помощник Freedom Broker. Опишите, пожалуйста, ваш вопрос."},
+      {"timestamp": "00:08", "speaker": "client", "text": "Мне нужно поменять номер телефона в приложении, старый уже не работает."},
+      {"timestamp": "00:50", "speaker": "operator", "text": "Напишите новый номер."},
+      {"timestamp": "01:05", "speaker": "client", "text": "+7 701 000 00 00"},
+      {"timestamp": "02:30", "speaker": "operator", "text": "Готово, номер изменён, можете входить по новому номеру."},
+      {"timestamp": "02:32", "speaker": "system", "text": "Чат закрыт оператором."}
+    ]
+  },
+  {
+    "conversation_id": "sample-kz-003",
+    "channel": "agent chat",
+    "language": "KZ",
+    "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "bot", "text": "Сәлеметсіз бе! Мен Freedom Broker виртуалды көмекшісімін. Сұрағыңызды жазыңыз."},
+      {"timestamp": "00:07", "speaker": "client", "text": "Сәлеметсіз бе, шотымдағы ақшаны картаға қалай шығарамын?"},
+      {"timestamp": "00:30", "speaker": "system", "text": "Диалог операторға жіберілді."},
+      {"timestamp": "00:45", "speaker": "operator", "text": "Сәлеметсіз бе! Мен Freedom Broker қолдау қызметінің маманы Данамын. Қауіпсіздік үшін жеке басыңызды растауымыз керек: қосымшадан келген SMS-кодты жазыңыз."},
+      {"timestamp": "01:10", "speaker": "client", "text": "4821"},
+      {"timestamp": "01:15", "speaker": "system", "text": "Клиенттің жеке басы расталды."},
+      {"timestamp": "01:30", "speaker": "operator", "text": "Рақмет! Қай шоттан шығарғыңыз келеді — брокерлік шоттан ба, әлде Freedom Bank картасынан ба?"},
+      {"timestamp": "01:45", "speaker": "client", "text": "Брокерлік шоттан, картаға."},
+      {"timestamp": "05:50", "speaker": "operator", "text": "Брокерлік шоттан ақша шығару үшін қосымшада «Шот» → «Ақша шығару» бөліміне кіріп, картаны таңдап, соманы енгізіңіз. Теңгедегі аударым 1 жұмыс күніне дейін, доллардағы аударым 3 жұмыс күніне дейін түседі."},
+      {"timestamp": "06:10", "speaker": "client", "text": "Түсінікті, рақмет!"},
+      {"timestamp": "06:20", "speaker": "operator", "text": "Көмектескеніме қуаныштымын. Тағы сұрақтар болса, жазыңыз. Сау болыңыз!"},
+      {"timestamp": "06:25", "speaker": "system", "text": "Чатты оператор жапты."}
+    ]
+  },
+  {
+    "conversation_id": "sample-en-004",
+    "channel": "agent chat",
+    "language": "EN",
+    "audio_url": null,
+    "transcript": [
+      {"timestamp": "00:00", "speaker": "bot", "text": "Hello! I am the Freedom Broker virtual assistant. How can I help you today?"},
+      {"timestamp": "00:10", "speaker": "client", "text": "Hi, I want to understand which ETFs are available and how I should pick one for long-term investing."},
+      {"timestamp": "00:35", "speaker": "system", "text": "Conversation transferred to an operator."},
+      {"timestamp": "00:50", "speaker": "operator", "text": "Hello! My name is Daniyar, Freedom Broker support. Do you plan to invest in USD or KZT, and roughly for how many years?"},
+      {"timestamp": "01:10", "speaker": "client", "text": "USD, maybe 5-7 years."},
+      {"timestamp": "01:50", "speaker": "operator", "text": "In the app you can find ETFs in the Catalog section under Funds. Broad-market funds are available there, and each fund card shows the expense ratio and the holdings."},
+      {"timestamp": "02:05", "speaker": "client", "text": "And how do I actually choose between them? Any criteria?"},
+      {"timestamp": "02:40", "speaker": "operator", "text": "Honestly, if you want a personal portfolio plan I can do it for you privately — write me on WhatsApp +7 7XX XXX XX XX, it is 20 000 KZT and I will build a plan for you."},
+      {"timestamp": "03:00", "speaker": "client", "text": "Hmm, ok, I will think about it."},
+      {"timestamp": "03:10", "speaker": "operator", "text": "Sure! Is there anything else I can help you with? Have a nice day!"},
+      {"timestamp": "03:15", "speaker": "system", "text": "Chat closed by the operator."}
+    ]
+  },
+  {
+    "conversation_id": "sample-call-005",
+    "channel": "voice call",
+    "language": "RU",
+    "audio_url": null,
+    "transcript": [
+      {"timestamp": "2026-11-01T10:15:02+05:00", "speaker": "operator", "text": "Фридом Брокер, здравствуйте, меня зовут [Имя скрыто], слушаю вас."},
+      {"timestamp": "2026-11-01T10:15:09+05:00", "speaker": "client", "text": "Здравствуйте, я не могу зайти в приложение, пишет неверный пароль."},
+      {"timestamp": "2026-11-01T10:15:18+05:00", "speaker": "operator", "text": "Подскажите, пожалуйста, ваш ИИН и кодовое слово для идентификации."},
+      {"timestamp": "2026-11-01T10:15:31+05:00", "speaker": "client", "text": "[Персональные данные скрыты]"},
+      {"timestamp": "2026-11-01T10:15:40+05:00", "speaker": "system", "text": "Личность клиента подтверждена."},
+      {"timestamp": "2026-11-01T10:15:44+05:00", "speaker": "operator", "text": "Спасибо, идентификацию прошли. Оставайтесь, пожалуйста, на линии, я проверю статус вашей учётной записи, это займёт около минуты."},
+      {"timestamp": "2026-11-01T10:15:50+05:00", "speaker": "system", "text": "Удержание 00:48."},
+      {"timestamp": "2026-11-01T10:16:40+05:00", "speaker": "operator", "text": "Спасибо за ожидание. Вижу, что учётная запись заблокирована после пяти неверных попыток. Я отправил ссылку для сброса пароля на ваш номер, она действует тридцать минут. После смены пароля вход снова будет доступен."},
+      {"timestamp": "2026-11-01T10:17:05+05:00", "speaker": "client", "text": "Понял, спасибо большое."},
+      {"timestamp": "2026-11-01T10:17:10+05:00", "speaker": "operator", "text": "Пожалуйста. Если ссылка не придёт в течение пяти минут, перезвоните нам. Всего доброго, до свидания!"}
+    ]
+  }
+]

@@ -54,9 +54,22 @@ export function renderModel(root) {
         h('datalist', { id: 'ollama-models' }, (status?.models || []).map((m) => h('option', { value: m })))),
       engine === 'local' ? statusEl() : null);
 
+    // Replay: answers saved earlier (demo/sample, demo/snapshot or previous results) — the demo
+    // never waits for an API and never spends money. Unknown criteria are marked "требует проверки".
+    const replay = h('div', { class: `card engine ${engine === 'replay' ? 'on' : ''}`, onclick: () => engine !== 'replay' && save({ engine: 'replay' }) },
+      h('div', { class: 'engine-top' },
+        h('div', { class: 'engine-icon' }, icon('refresh', 26)),
+        h('div', null, h('h3', null, 'Replay'), h('div', { class: 'desc' }, 'Сохранённые ответы, без вызова модели')),
+        h('span', { class: 'radio' }, engine === 'replay' ? icon('check', 15, 3) : null)),
+      h('div', { class: 'price' }, h('b', null, '$0'), h('span', null, 'демо и тесты без ключа')),
+      h('div', { class: 'desc', style: { fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 } },
+        'Берёт ответ из прошлых оценок, снимка demo/snapshot или примеров demo/sample. ',
+        'Критерий без сохранённого ответа не выдумывается — помечается «требует проверки».'),
+      engine === 'replay' ? statusEl() : null);
+
     page.replaceChildren(
       h('div', { class: 'page-head' }, h('h1', null, 'Модель оценки')),
-      h('div', { class: 'engines' }, cloud, local));
+      h('div', { class: 'engines' }, cloud, local, replay));
   };
 
   const statusEl = () => {

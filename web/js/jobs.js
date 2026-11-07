@@ -80,6 +80,8 @@ function finish(j) {
     toast(j.errors[0]?.message || 'Оценка не удалась', { type: 'error', timeout: 8000 });
   } else if (j.failed) {
     toast(`Оценено ${j.done}, с ошибкой ${j.failed}: ${j.errors[0]?.message || ''}`, { type: 'error', timeout: 8000 });
+  } else if (j.needsReview) {
+    toast(`Готово: ${j.done} ${pluralRu(j.done, 'диалог оценён', 'диалога оценено', 'диалогов оценено')}; в ${j.needsReview} ${pluralRu(j.needsReview, 'диалоге', 'диалогах', 'диалогах')} есть критерии, требующие проверки`, { timeout: 7000 });
   } else {
     toast(`Готово: ${j.done} ${pluralRu(j.done, 'диалог оценён', 'диалога оценено', 'диалогов оценено')}`);
   }

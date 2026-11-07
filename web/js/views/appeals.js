@@ -2,7 +2,7 @@
 import { h, icon, fmtScore, openModal, toast, fmtDate, channelLabel } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, allAppeals, putResult } from '../store.js';
-import { finalAnswers, score, verdictOf, answerOptions } from '../scoring.js';
+import { finalAnswers, score, verdictOf, answerOptions, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
 import { displayTimes } from './dialog.js';
 
 let tab = 'pending';
@@ -120,6 +120,9 @@ export function openReview(result, appeal) {
         h('div', { class: 'quote' }, appeal.comment),
         h('div', { class: 'rm-ai' }, h('span', { class: `tag ${aiV.cls === 'ok' ? 'green' : aiV.cls === 'fail' ? 'red' : aiV.cls === 'part' ? 'amber' : ''}` },
           `ИИ: ${aiV.text}${c.type === 'scale' && aiV.text !== 'N/A' ? ` / ${aiV.max}` : ''}`), h('span', null, ai.explanation || '')),
+        ai.confidence ? h('div', { style: { fontSize: '12.5px', color: 'var(--muted)', marginTop: '6px' } },
+          `Уверенность модели: ${CONFIDENCE_LABEL[ai.confidence] || ai.confidence}`,
+          disputeLabel(ai) ? ` · ${disputeLabel(ai).text}${ai.issues?.length ? `: ${ai.issues.join(' ')}` : ''}` : '') : null,
         idx.size ? fragment : null),
       h('div', { class: 'rm-box' },
         h('h4', null, 'Решение проверяющего'),

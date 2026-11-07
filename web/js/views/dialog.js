@@ -3,7 +3,7 @@
 import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, resultFor, summaryFor, putResult } from '../store.js';
-import { finalAnswers, score, verdictOf, round2 } from '../scoring.js';
+import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
 
@@ -180,7 +180,8 @@ export function renderDialog(root, cid) {
           h('span', { class: 'n' }, name),
           h('div', { class: 'bar' }, h('i', { style: { width: `${s.pct ?? 0}%` } })),
           h('span', { class: 'p' }, s.pct == null ? 'N/A' : `${Math.round(s.pct)}%`)))) : null,
-      h('div', { class: 'total-meta' }, `Чек-лист «${res.checklist.name}», версия ${res.checklist.version} · ${fmtDate(res.createdAt)}`));
+      h('div', { class: 'total-meta' }, `Чек-лист «${res.checklist.name}», версия ${res.checklist.version} · ${fmtDate(res.createdAt)}`),
+      provenanceLine(res));
 
     const groups = [];
     let lastSec = null;
@@ -213,8 +214,12 @@ export function renderDialog(root, cid) {
       : h('span', { class: `verdict ${v.cls}` }, v.text);
 
     const evLabel = status === 'fail' ? 'Проверенный участок' : status === 'na' ? 'Основание' : 'Доказательство';
+    const dispute = disputeLabel(ans);
     const body = isOpen ? h('div', { class: 'crit-body' },
       ans?.explanation ? h('div', { class: 'expl' }, ans.explanation) : null,
+      dispute ? h('div', { class: `dispute ${dispute.cls}` },
+        icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
+      ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность модели: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
       ev.length ? h('div', null,
         h('div', { style: { fontSize: '12px', color: 'var(--muted)', fontWeight: 600, marginBottom: '6px' } }, evLabel),
         h('div', { class: 'ev-list' }, ev.map((i) =>
@@ -230,8 +235,19 @@ export function renderDialog(root, cid) {
         h('span', { class: `st ${status}` }, icon(stIcon, 16, 2.6)),
         h('div', { class: 'nm' }, h('small', null, c.code), c.name),
         h('div', { class: 'vd' }, pending ? h('span', { class: 'tag amber', title: 'Апелляция' }, icon('scale', 13)) : null,
+          dispute && !ans?.overridden ? h('span', { class: `tag ${dispute.cls}`, title: dispute.text }, icon('alert', 13), h('span', { class: 'tag-text' }, dispute.text)) : null,
           ans?.overridden ? h('span', { class: 'tag green' }, 'изменено') : null, verdict)),
       body);
+  }
+
+  function provenanceLine(res) {
+    const parts = [];
+    if (res.engine?.type === 'replay') parts.push('replay — сохранённый ответ, без вызова модели');
+    else if (res.engine?.model) parts.push(`модель ${res.engine.model}`);
+    if (res.attempts > 1) parts.push(`${res.attempts} попытки: ответ исправлялся после проверки`);
+    if (res.usage?.costUsd) parts.push(`$${res.usage.costUsd.toFixed(3)}`);
+    if (res.promptHash) parts.push(`промпт ${res.promptHash}`);
+    return parts.length ? h('div', { class: 'total-meta' }, parts.join(' · ')) : null;
   }
 
   function pointsText(c, p, sc) {

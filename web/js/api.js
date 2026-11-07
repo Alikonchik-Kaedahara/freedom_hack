@@ -20,9 +20,24 @@ async function req(method, url, body) {
 
 const e = encodeURIComponent;
 
+async function upload(url, file, fields = {}) {
+  const form = new FormData();
+  form.append('file', file, file.name);
+  for (const [k, v] of Object.entries(fields)) if (v) form.append(k, v);
+  const res = await fetch(BASE + url, { method: 'POST', body: form });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `Ошибка сервера (${res.status})`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
+}
+
 export const api = {
   datasets: () => req('GET', '/api/datasets'),
   importDataset: (groupId) => req('POST', '/api/datasets/import', { groupId }),
+  uploadDataset: (file, groupId) => upload('/api/datasets/upload', file, { groupId }),
   dataset: (g) => req('GET', `/api/datasets/${e(g)}`),
 
   checklists: () => req('GET', '/api/checklists'),

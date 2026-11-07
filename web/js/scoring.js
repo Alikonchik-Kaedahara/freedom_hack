@@ -71,13 +71,34 @@ export function score(checklist, answers) {
   return { total, gross, grossIds, per, sections, earned, possible };
 }
 
+/**
+ * Criteria the reviewer should look at: the model's answer failed validation after all
+ * retries (needsReview) or the model itself reported low confidence. Mirrors cqa/scoring.py.
+ */
+export function disputedIds(result) {
+  const out = [];
+  for (const [id, a] of Object.entries(result?.answers || {})) {
+    if (a?.needsReview || a?.confidence === 'low') out.push(id);
+  }
+  return out;
+}
+
+export function disputeLabel(a) {
+  if (a?.needsReview) return { text: 'Требует проверки', cls: 'red', why: (a.issues || []).join(' ') };
+  if (a?.confidence === 'low') return { text: 'Низкая уверенность', cls: 'amber', why: 'Модель не уверена в вердикте — проверьте вручную.' };
+  return null;
+}
+
+export const CONFIDENCE_LABEL = { high: 'высокая', medium: 'средняя', low: 'низкая' };
+
 /** Summary of a stored result: original vs final (after appeals). */
 export function summarize(result) {
   if (!result) return null;
   const original = score(result.checklist, result.answers);
   const final = score(result.checklist, finalAnswers(result));
   const pending = (result.appeals || []).filter((a) => a.status === 'pending').length;
-  return { original, final, total: final.total, gross: final.gross, pending, changed: original.total !== final.total };
+  const disputed = disputedIds(result);
+  return { original, final, total: final.total, gross: final.gross, pending, changed: original.total !== final.total, disputed };
 }
 
 /** Human verdict for one criterion answer. */

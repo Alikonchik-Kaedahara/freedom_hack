@@ -6,7 +6,7 @@ import threading
 
 from .defaults import DEFAULT_CHECKLISTS, DEFAULT_SETTINGS
 
-ROOT = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
+ROOT = os.environ.get("CQA_STORAGE_DIR") or os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage")
 _lock = threading.RLock()
 
 
@@ -51,6 +51,19 @@ def save_dataset(group_id, records, imported_at):
         }
         _write("datasets", meta)
         return meta[group_id]
+
+
+def upsert_dataset(group_id, records, imported_at):
+    """Add records to a group (uploaded files): same conversation_id replaces, new ones are appended."""
+    with _lock:
+        existing = get_dataset(group_id)
+        by_id = {r["conversation_id"]: r for r in existing}
+        for r in records:
+            by_id[r["conversation_id"]] = r
+        merged = [by_id[r["conversation_id"]] for r in existing] + [r for r in records if r["conversation_id"] not in {e["conversation_id"] for e in existing}]
+        meta = save_dataset(group_id, merged, imported_at)
+        meta["added"] = len(records)
+        return meta
 
 
 def get_dataset(group_id):

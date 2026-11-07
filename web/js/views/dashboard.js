@@ -21,6 +21,7 @@ function build() {
   const avg = totals.length ? round2(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
   const gross = evaluated.filter((r) => summaryFor(r.conversation_id).gross).length;
   const appeals = pendingAppeals().length;
+  const disputed = evaluated.reduce((n, r) => n + (summaryFor(r.conversation_id).disputed?.length || 0), 0);
   const running = state.job?.status === 'running';
 
   const head = h('div', { class: 'page-head' },
@@ -38,7 +39,9 @@ function build() {
       h('div', { class: 'bar thin' }, h('i', { style: { width: `${pct}%` } })),
       pct === 100 ? h('span', { class: 'corner', style: { color: 'var(--green)' } }, icon('check', 22, 2.5)) : null),
     kpi('Грубые ошибки', gross, null, gross ? h('span', { class: 'corner', style: { color: 'var(--red)' } }, icon('alert', 22)) : null, gross ? 'danger' : ''),
-    kpi('Апелляции', appeals, h('span', { class: 'kpi-label', style: { fontSize: '13px' } }, appeals ? 'ждут решения' : 'нет новых')));
+    kpi('Апелляции', appeals, h('span', { class: 'kpi-label', style: { fontSize: '13px' } },
+      [appeals ? 'ждут решения' : 'нет новых', disputed ? `спорных критериев: ${disputed}` : null].filter(Boolean).join(' · ')),
+    disputed ? h('span', { class: 'corner', style: { color: 'var(--amber)' } }, icon('alert', 22)) : null));
 
   if (!evaluated.length) {
     return h('div', { class: 'page' }, head, kpis,
@@ -115,28 +118,37 @@ function segmentsCard(evaluated) {
     })));
 }
 
+// Dialogs the reviewer should open first: gross errors, pending appeals, disputed criteria
+// (the model's answer failed validation or has low confidence — see cqa/evaluator.py), low totals.
 function attentionCard(evaluated) {
   const items = evaluated.map((r) => {
     const s = summaryFor(r.conversation_id);
     const res = resultFor(r.conversation_id);
     const flagCrit = res.checklist.criteria.find((c) => c.type === 'flag' && finalAnswers(res)[c.id]?.answer === 'yes');
-    return { r, s, flagCrit, rank: (s.gross ? 0 : s.pending ? 1 : 2) * 1000 + (s.total ?? 0) };
-  }).filter((x) => x.s.gross || x.s.pending || (x.s.total != null && x.s.total < 65))
-    .sort((a, b) => a.rank - b.rank).slice(0, 6);
+    const disputed = (s.disputed || []).map((id) => res.checklist.criteria.find((c) => c.id === id)).filter(Boolean);
+    const kind = s.gross ? 'gross' : s.pending ? 'appeal' : disputed.length ? 'disputed' : 'low';
+    return { r, s, flagCrit, disputed, kind, rank: { gross: 0, appeal: 1, disputed: 2, low: 3 }[kind] * 1000 + (s.total ?? 0) };
+  }).filter((x) => x.s.gross || x.s.pending || x.disputed.length || (x.s.total != null && x.s.total < 65))
+    .sort((a, b) => a.rank - b.rank).slice(0, 8);
 
   if (!items.length) return null;
   return h('div', { class: 'card card-pad', style: { marginTop: '20px' } },
     h('h3', { class: 'card-title' }, 'Требуют внимания'),
-    h('div', { class: 'attention' }, items.map(({ r, s, flagCrit }) => {
+    h('div', { class: 'attention' }, items.map(({ r, s, flagCrit, disputed, kind }) => {
       const res = resultFor(r.conversation_id);
-      const sub = flagCrit ? (finalAnswers(res)[flagCrit.id]?.explanation || 'Грубая ошибка')
-        : s.pending ? 'Апелляция ждёт решения' : 'Низкий итоговый балл';
+      const sub = kind === 'gross' ? (finalAnswers(res)[flagCrit.id]?.explanation || 'Грубая ошибка')
+        : kind === 'appeal' ? 'Апелляция ждёт решения'
+          : kind === 'disputed' ? `Спорные критерии: ${disputed.map((c) => c.code || c.name).join(', ')} — проверьте вручную`
+            : 'Низкий итоговый балл';
+      const tag = kind === 'gross' ? h('span', { class: 'tag red' }, icon('flag', 14), 'Критично')
+        : kind === 'appeal' ? h('span', { class: 'tag amber' }, 'Апелляция')
+          : kind === 'disputed' ? h('span', { class: 'tag amber' }, icon('alert', 14), 'Спорно') : h('span');
       return h('div', { class: 'att-row', onclick: () => (location.hash = `#/dialog/${encodeURIComponent(r.conversation_id)}`) },
-        h('div', { class: `att-icon ${s.gross ? 'red' : ''}` }, icon(s.gross ? 'shield' : s.pending ? 'scale' : channelIcon(r.channel), 20)),
+        h('div', { class: `att-icon ${s.gross ? 'red' : ''}` }, icon(kind === 'gross' ? 'shield' : kind === 'appeal' ? 'scale' : kind === 'disputed' ? 'alert' : channelIcon(r.channel), 20)),
         h('div', { style: { minWidth: 0 } },
           h('div', { class: 'title' }, r.conversation_id, h('span', { style: { color: 'var(--muted)', fontWeight: 500 } }, ` · ${channelLabel(r.channel)} · ${r.language}`)),
           h('div', { class: 'sub' }, sub)),
-        s.gross ? h('span', { class: 'tag red' }, icon('flag', 14), 'Критично') : s.pending ? h('span', { class: 'tag amber' }, 'Апелляция') : h('span'),
+        tag,
         h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total)));
     })));
 }

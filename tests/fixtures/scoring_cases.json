@@ -1,0 +1,498 @@
+{
+ "checklist": {
+  "id": "chat-base",
+  "name": "Чаты",
+  "channel": "agent chat",
+  "version": 1,
+  "criteria": [
+   {
+    "id": "c1",
+    "code": "01",
+    "name": "Установление контакта",
+    "section": "Начало и понимание запроса",
+    "type": "binary",
+    "weight": 10,
+    "naAllowed": false
+   },
+   {
+    "id": "c2",
+    "code": "02",
+    "name": "Выявление потребности",
+    "section": "Начало и понимание запроса",
+    "type": "binary",
+    "weight": 15,
+    "naAllowed": true
+   },
+   {
+    "id": "c3",
+    "code": "03",
+    "name": "Идентификация",
+    "section": "Безопасность и решение",
+    "type": "binary",
+    "weight": 20,
+    "naAllowed": true
+   },
+   {
+    "id": "c4",
+    "code": "04",
+    "name": "Корректная и полная консультация",
+    "section": "Безопасность и решение",
+    "type": "scale",
+    "weight": 20,
+    "naAllowed": true,
+    "scale": [
+     {
+      "value": 20,
+      "label": "Все существенные вопросы закрыты или дан корректный следующий шаг."
+     },
+     {
+      "value": 15,
+      "label": "Основной вопрос решён, пропущена второстепенная деталь."
+     },
+     {
+      "value": 10,
+      "label": "Часть запроса закрыта, существенный вопрос остался открытым."
+     },
+     {
+      "value": 5,
+      "label": "Есть общая подсказка, но клиенту всё ещё непонятно, как действовать."
+     },
+     {
+      "value": 0,
+      "label": "Ответа по существу нет или ключевая рекомендация ошибочна."
+     }
+    ]
+   },
+   {
+    "id": "c5",
+    "code": "05",
+    "name": "Эмпатия и клиентоориентированность",
+    "section": "Ведение и завершение диалога",
+    "type": "binary",
+    "weight": 15,
+    "naAllowed": false
+   },
+   {
+    "id": "c6",
+    "code": "06",
+    "name": "Управление диалогом, скорость и грамотность",
+    "section": "Ведение и завершение диалога",
+    "type": "scale",
+    "weight": 15,
+    "naAllowed": false,
+    "scale": [
+     {
+      "value": 10,
+      "label": "Ответы ясные и связные. Если было явное ожидание, оператор предупредил."
+     },
+     {
+      "value": 7,
+      "label": "Один заметный сбой, но клиент может понять ответ и продолжить."
+     },
+     {
+      "value": 4,
+      "label": "Клиенту приходится переспрашивать из-за формулировок или порядка ответов."
+     },
+     {
+      "value": 0,
+      "label": "Из-за бессвязных или противоречивых реплик ход диалога непонятен."
+     }
+    ]
+   },
+   {
+    "id": "c7",
+    "code": "07",
+    "name": "Завершение",
+    "section": "Ведение и завершение диалога",
+    "type": "binary",
+    "weight": 5,
+    "naAllowed": true
+   },
+   {
+    "id": "c8",
+    "code": "08",
+    "name": "Грубые ошибки",
+    "section": "Грубые нарушения",
+    "type": "flag",
+    "weight": 0,
+    "naAllowed": false
+   }
+  ]
+ },
+ "cases": [
+  {
+   "name": "pdf_example_na_on_03",
+   "note": "Пример из README/чек-листа: 03 = N/A, 04 = 15 из 20, 06 = 7 из 10, 07 = Нет",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": "na"
+    },
+    "c4": {
+     "answer": 15
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 7
+    },
+    "c7": {
+     "answer": "no"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 81.88,
+    "gross": false,
+    "possible": 80,
+    "earned": 65.5,
+    "sections": {
+     "Начало и понимание запроса": 100,
+     "Безопасность и решение": 75,
+     "Ведение и завершение диалога": 72.86
+    }
+   }
+  },
+  {
+   "name": "all_yes_top_scale",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": "yes"
+    },
+    "c4": {
+     "answer": 20
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 10
+    },
+    "c7": {
+     "answer": "yes"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 100,
+    "gross": false,
+    "possible": 100
+   }
+  },
+  {
+   "name": "gross_flag_does_not_change_points",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": "yes"
+    },
+    "c4": {
+     "answer": 20
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 10
+    },
+    "c7": {
+     "answer": "yes"
+    },
+    "c8": {
+     "answer": "yes"
+    }
+   },
+   "expected": {
+    "total": 100,
+    "gross": true,
+    "grossIds": [
+     "c8"
+    ]
+   }
+  },
+  {
+   "name": "all_no_and_zero",
+   "answers": {
+    "c1": {
+     "answer": "no"
+    },
+    "c2": {
+     "answer": "no"
+    },
+    "c3": {
+     "answer": "no"
+    },
+    "c4": {
+     "answer": 0
+    },
+    "c5": {
+     "answer": "no"
+    },
+    "c6": {
+     "answer": 0
+    },
+    "c7": {
+     "answer": "no"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 0,
+    "gross": false,
+    "possible": 100
+   }
+  },
+  {
+   "name": "every_na_allowed_is_na",
+   "note": "N/A везде, где разрешён: остаются 01, 05, 06 (вес 40 → 100)",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "na"
+    },
+    "c3": {
+     "answer": "na"
+    },
+    "c4": {
+     "answer": "na"
+    },
+    "c5": {
+     "answer": "no"
+    },
+    "c6": {
+     "answer": 4
+    },
+    "c7": {
+     "answer": "na"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 40,
+    "possible": 40,
+    "earned": 16
+   }
+  },
+  {
+   "name": "scale_mid_step",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": "yes"
+    },
+    "c4": {
+     "answer": 10
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 4
+    },
+    "c7": {
+     "answer": "yes"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 81,
+    "possible": 100
+   },
+   "note": "04 = 10 из 20 → 10 баллов, 06 = 4 из 10 → 6 баллов"
+  },
+  {
+   "name": "missing_answer_is_excluded",
+   "note": "answer null (needsReview) исключается из весов, как N/A",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": null
+    },
+    "c4": {
+     "answer": 20
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 10
+    },
+    "c7": {
+     "answer": "yes"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 100,
+    "possible": 80
+   }
+  },
+  {
+   "name": "na_everywhere_low_total",
+   "note": "Остаются 01 (Да), 05 (Нет), 06 (0): 10 из 40 → 25",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "na"
+    },
+    "c3": {
+     "answer": "na"
+    },
+    "c4": {
+     "answer": "na"
+    },
+    "c5": {
+     "answer": "no"
+    },
+    "c6": {
+     "answer": 0
+    },
+    "c7": {
+     "answer": "na"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 25,
+    "possible": 40
+   }
+  },
+  {
+   "name": "sample_kz_003_like",
+   "answers": {
+    "c1": {
+     "answer": "yes"
+    },
+    "c2": {
+     "answer": "yes"
+    },
+    "c3": {
+     "answer": "yes"
+    },
+    "c4": {
+     "answer": 20
+    },
+    "c5": {
+     "answer": "yes"
+    },
+    "c6": {
+     "answer": 7
+    },
+    "c7": {
+     "answer": "yes"
+    },
+    "c8": {
+     "answer": "no"
+    }
+   },
+   "expected": {
+    "total": 95.5
+   }
+  }
+ ],
+ "appeal": {
+  "name": "appeal_accepted_recomputes",
+  "answers": {
+   "c1": {
+    "answer": "no"
+   },
+   "c2": {
+    "answer": "yes"
+   },
+   "c3": {
+    "answer": "no"
+   },
+   "c4": {
+    "answer": 15
+   },
+   "c5": {
+    "answer": "no"
+   },
+   "c6": {
+    "answer": 7
+   },
+   "c7": {
+    "answer": "no"
+   },
+   "c8": {
+    "answer": "no"
+   }
+  },
+  "appeals": [
+   {
+    "id": "a1",
+    "criterionId": "c5",
+    "status": "accepted",
+    "decision": {
+     "answer": "yes",
+     "reason": "ok"
+    }
+   },
+   {
+    "id": "a2",
+    "criterionId": "c1",
+    "status": "rejected",
+    "decision": {
+     "answer": null,
+     "reason": "no"
+    }
+   },
+   {
+    "id": "a3",
+    "criterionId": "c7",
+    "status": "pending"
+   }
+  ],
+  "expected": {
+   "originalTotal": 40.5,
+   "total": 55.5,
+   "pending": 1,
+   "changed": true
+  }
+ }
+}
