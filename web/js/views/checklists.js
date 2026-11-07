@@ -6,7 +6,7 @@ import { state, subscribe, refreshChecklists, saveSettings, resultFor } from '..
 import { finalAnswers, score, round2 } from '../scoring.js';
 import { startEvaluation } from '../jobs.js';
 
-const COLORS = ['#0E4630', '#1A9F4B', '#19798B', '#3CC36A', '#5FB3C2', '#7A6FD0', '#9BCB5A', '#E0A91B', '#C25B9B', '#2F6FDB'];
+const COLORS = ['#1E7B4F', '#1A9F4B', '#19798B', '#3CC36A', '#5FB3C2', '#7A6FD0', '#9BCB5A', '#E0A91B', '#C25B9B', '#2F6FDB'];
 const CHANNELS = { 'agent chat': 'Чаты', 'voice call': 'Звонки' };
 const TYPES = [['binary', 'Да / Нет'], ['scale', 'Шкала'], ['flag', 'Грубая ошибка']];
 const EXPORT_IDS = ['contact', 'discovery', 'identification', 'consultation', 'empathy', 'dialogue', 'closure', 'critical'];

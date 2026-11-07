@@ -60,40 +60,46 @@
   -webkit-font-smoothing: antialiased;
   text-align: left; }
 #cqa-d365-root.cqa-host-on { --cqa-chrome: 90px; }
-#cqa-d365-root[data-theme="dark"] { --cqa-bg-canvas: #060B08;
-  --cqa-bg-surface: #0C1410;
-  --cqa-bg-elevated: #121D17;
-  --cqa-bg-ribbon: #040705;
-  --cqa-border-hairline: #1B2B22;
-  --cqa-border-strong: #2A4235;
-  --cqa-text-primary: #ECFDF5;
-  --cqa-text-secondary: #9BB5A8;
-  --cqa-text-muted: #5E7A6B;
-  --cqa-brand-primary: #00D66C;
-  --cqa-brand-hover: #00B85C;
-  --cqa-brand-soft: rgba(0, 214, 108, .12);
-  --cqa-brand-border: rgba(0, 214, 108, .35);
-  --cqa-pass-text: #34D399;
-  --cqa-pass-bg: rgba(16, 185, 129, .12);
-  --cqa-pass-border: rgba(52, 211, 153, .35);
+#cqa-d365-root[data-theme="dark"] { --cqa-bg-canvas: #121417;
+  --cqa-bg-surface: #1B1E22;
+  --cqa-bg-elevated: #22262B;
+  --cqa-bg-sunken: #2A2F35;
+  --cqa-bg-ribbon: #0E1013;
+  --cqa-border-hairline: #2F343B;
+  --cqa-border-strong: #444B54;
+  --cqa-text-primary: #E8EAED;
+  --cqa-text-secondary: #B4BAC2;
+  --cqa-text-muted: #858C96;
+  --cqa-brand-primary: #2FBF71;
+  --cqa-brand-hover: #27A862;
+  --cqa-brand-action: #2FBF71;
+  --cqa-brand-soft: rgba(47, 191, 113, .14);
+  --cqa-brand-border: rgba(47, 191, 113, .4);
+  --cqa-header: #17191D;
+  --cqa-d365-bar: #0B0D10;
+  --cqa-bar-good: #2FBF71;
+  --cqa-bar-low: #F0605D;
+  --cqa-bar-track: #2A2F35;
+  --cqa-pass-text: #4ADE80;
+  --cqa-pass-bg: rgba(74, 222, 128, .1);
+  --cqa-pass-border: rgba(74, 222, 128, .3);
   --cqa-warn-text: #FBBF24;
-  --cqa-warn-bg: rgba(245, 158, 11, .12);
-  --cqa-warn-border: rgba(251, 191, 36, .35);
+  --cqa-warn-bg: rgba(251, 191, 36, .1);
+  --cqa-warn-border: rgba(251, 191, 36, .3);
   --cqa-fail-text: #F87171;
-  --cqa-fail-bg: rgba(239, 68, 68, .12);
-  --cqa-fail-border: rgba(248, 113, 113, .35);
-  --cqa-na-text: #94A3B8;
-  --cqa-na-bg: rgba(148, 163, 184, .12);
-  --cqa-na-border: rgba(148, 163, 184, .3);
-  --cqa-bg-sunken: #16231C;
-  --cqa-pass-solid: #00C062;
-  --cqa-warn-solid: #F59E0B;
-  --cqa-fail-solid: #EF4444;
-  --cqa-info-text: #7DD3E0;
-  --cqa-info-bg: rgba(45, 160, 180, .14);
-  --cqa-karaoke: #FDE047;
-  --cqa-shadow: 0 1px 2px rgba(0, 0, 0, .4);
-  --cqa-shadow-pop: 0 10px 32px rgba(0, 0, 0, .55), 0 0 0 1px #1B2B22;
+  --cqa-fail-bg: rgba(248, 113, 113, .1);
+  --cqa-fail-border: rgba(248, 113, 113, .32);
+  --cqa-na-text: #9CA3AF;
+  --cqa-na-bg: rgba(156, 163, 175, .12);
+  --cqa-na-border: rgba(156, 163, 175, .28);
+  --cqa-pass-solid: #2FBF71;
+  --cqa-warn-solid: #E3A008;
+  --cqa-fail-solid: #E5534B;
+  --cqa-info-text: #8EC5FF;
+  --cqa-info-bg: rgba(88, 166, 255, .12);
+  --cqa-karaoke: #F5D547;
+  --cqa-shadow: none;
+  --cqa-shadow-pop: 0 10px 32px rgba(0, 0, 0, .55), 0 0 0 1px #2F343B;
   color-scheme: dark; }
 #cqa-d365-root *,
 #cqa-d365-root *::before,
@@ -634,6 +640,9 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .toast.ok .ic { color: var(--cqa-brand-neon); }
 #cqa-d365-root .toast.error { background: var(--cqa-fail-text); }
 #cqa-d365-root .toast button { background: rgba(255,255,255,.14); border: 0; color: #fff; border-radius: 4px; padding: 4px 8px; font-weight: 600; font-size: 12.5px; }
+#cqa-d365-root[data-theme="dark"] .ribbon { border-bottom: 1px solid var(--cqa-border-hairline); }
+#cqa-d365-root[data-theme="dark"] .rb-action .btn-primary { color: #06140C; }
+#cqa-d365-root[data-theme="dark"] .tcell + .tcell { border-color: var(--cqa-border-hairline); }
 #cqa-d365-root[data-theme="dark"] .btn-primary,
 #cqa-d365-root[data-theme="dark"] .option.on,
 #cqa-d365-root[data-theme="dark"] .recalc:not(.neutral) { color: #03130A; }
@@ -657,6 +666,7 @@ from { opacity: 0; transform: translateY(6px); }
   --cqa-d365-bar: #0B1A2E;
   --cqa-bar-good: #009951;
   --cqa-bar-low: #EF4444;
+  --cqa-bar-track: #E8EDEA;
   --cqa-ribbon: 52px;
   --cqa-chrome: 52px;
   --cqa-shadow: none; }
@@ -706,7 +716,7 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .tcell .stack-foot { display: flex; flex-direction: column; align-items: center; gap: 6px; width: 100%; font-size: 12px; color: var(--cqa-text-muted); }
 #cqa-d365-root .cchart .ok { fill: var(--cqa-bar-good); }
 #cqa-d365-root .cchart .fail { fill: var(--cqa-bar-low); }
-#cqa-d365-root .cchart .trk { fill: #E8EDEA; }
+#cqa-d365-root .cchart .trk { fill: var(--cqa-bar-track); }
 #cqa-d365-root .legend-inline i.ok { background: var(--cqa-bar-good); }
 #cqa-d365-root .legend-inline i.fail { background: var(--cqa-bar-low); }
 #cqa-d365-root .v3-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 12px; }
@@ -760,8 +770,8 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .rb-badge,
 #cqa-d365-root .rb-action { display: none !important; }
 #cqa-d365-root .rb-title,
-#cqa-d365-root .bridge-badge,
-#cqa-d365-root .theme-toggle { display: none !important; }
+#cqa-d365-root .bridge-badge { display: none !important; }
+#cqa-d365-root .theme-toggle { width: 34px; padding: 0; justify-content: center; }
 #cqa-d365-root .page-head { padding: 12px 14px; min-height: 0; }
 #cqa-d365-root .v3-split { grid-template-columns: 1fr; }
 #cqa-d365-root .tri-row { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -779,7 +789,7 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .tabbar .tab-icon { position: relative; width: 52px; height: 28px; display: grid; place-items: center; border-radius: 14px; }
 #cqa-d365-root .tabbar a.active .tab-icon { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
 #cqa-d365-root .tabbar .dot { position: absolute; top: -3px; right: 8px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--cqa-critical-accent); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--cqa-bg-surface); }
-#cqa-d365-root[data-theme="dark"] .tabbar { background: rgba(12, 20, 16, .94); }
+#cqa-d365-root[data-theme="dark"] .tabbar { background: rgba(27, 30, 34, .95); }
 #cqa-d365-root .theme-toggle .lbl { display: none; }
 #cqa-d365-root .tabbar .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 #cqa-d365-root .page { padding: 12px 12px 24px; }

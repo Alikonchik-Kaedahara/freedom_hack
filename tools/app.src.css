@@ -68,41 +68,47 @@
 :scope.cqa-host-on { --cqa-chrome: 90px; }
 
 :scope[data-theme="dark"] {
-  /* Dark mode: "Tradernet Pro Terminal" */
-  --cqa-bg-canvas: #060B08;
-  --cqa-bg-surface: #0C1410;
-  --cqa-bg-elevated: #121D17;
-  --cqa-bg-ribbon: #040705;
-  --cqa-border-hairline: #1B2B22;
-  --cqa-border-strong: #2A4235;
-  --cqa-text-primary: #ECFDF5;
-  --cqa-text-secondary: #9BB5A8;
-  --cqa-text-muted: #5E7A6B;
-  --cqa-brand-primary: #00D66C;
-  --cqa-brand-hover: #00B85C;
-  --cqa-brand-soft: rgba(0, 214, 108, .12);
-  --cqa-brand-border: rgba(0, 214, 108, .35);
-  --cqa-pass-text: #34D399;
-  --cqa-pass-bg: rgba(16, 185, 129, .12);
-  --cqa-pass-border: rgba(52, 211, 153, .35);
+  /* Dark mode: neutral graphite (no green tint); emerald stays an accent only */
+  --cqa-bg-canvas: #121417;
+  --cqa-bg-surface: #1B1E22;
+  --cqa-bg-elevated: #22262B;
+  --cqa-bg-sunken: #2A2F35;
+  --cqa-bg-ribbon: #0E1013;
+  --cqa-border-hairline: #2F343B;
+  --cqa-border-strong: #444B54;
+  --cqa-text-primary: #E8EAED;
+  --cqa-text-secondary: #B4BAC2;
+  --cqa-text-muted: #858C96;
+  --cqa-brand-primary: #2FBF71;
+  --cqa-brand-hover: #27A862;
+  --cqa-brand-action: #2FBF71;
+  --cqa-brand-soft: rgba(47, 191, 113, .14);
+  --cqa-brand-border: rgba(47, 191, 113, .4);
+  --cqa-header: #17191D;
+  --cqa-d365-bar: #0B0D10;
+  --cqa-bar-good: #2FBF71;
+  --cqa-bar-low: #F0605D;
+  --cqa-bar-track: #2A2F35;
+  --cqa-pass-text: #4ADE80;
+  --cqa-pass-bg: rgba(74, 222, 128, .1);
+  --cqa-pass-border: rgba(74, 222, 128, .3);
   --cqa-warn-text: #FBBF24;
-  --cqa-warn-bg: rgba(245, 158, 11, .12);
-  --cqa-warn-border: rgba(251, 191, 36, .35);
+  --cqa-warn-bg: rgba(251, 191, 36, .1);
+  --cqa-warn-border: rgba(251, 191, 36, .3);
   --cqa-fail-text: #F87171;
-  --cqa-fail-bg: rgba(239, 68, 68, .12);
-  --cqa-fail-border: rgba(248, 113, 113, .35);
-  --cqa-na-text: #94A3B8;
-  --cqa-na-bg: rgba(148, 163, 184, .12);
-  --cqa-na-border: rgba(148, 163, 184, .3);
-  --cqa-bg-sunken: #16231C;
-  --cqa-pass-solid: #00C062;
-  --cqa-warn-solid: #F59E0B;
-  --cqa-fail-solid: #EF4444;
-  --cqa-info-text: #7DD3E0;
-  --cqa-info-bg: rgba(45, 160, 180, .14);
-  --cqa-karaoke: #FDE047;
-  --cqa-shadow: 0 1px 2px rgba(0, 0, 0, .4);
-  --cqa-shadow-pop: 0 10px 32px rgba(0, 0, 0, .55), 0 0 0 1px #1B2B22;
+  --cqa-fail-bg: rgba(248, 113, 113, .1);
+  --cqa-fail-border: rgba(248, 113, 113, .32);
+  --cqa-na-text: #9CA3AF;
+  --cqa-na-bg: rgba(156, 163, 175, .12);
+  --cqa-na-border: rgba(156, 163, 175, .28);
+  --cqa-pass-solid: #2FBF71;
+  --cqa-warn-solid: #E3A008;
+  --cqa-fail-solid: #E5534B;
+  --cqa-info-text: #8EC5FF;
+  --cqa-info-bg: rgba(88, 166, 255, .12);
+  --cqa-karaoke: #F5D547;
+  --cqa-shadow: none;
+  --cqa-shadow-pop: 0 10px 32px rgba(0, 0, 0, .55), 0 0 0 1px #2F343B;
   color-scheme: dark;
 }
 
@@ -671,6 +677,10 @@ p { margin: 0; }
 .toast.error { background: var(--cqa-fail-text); }
 .toast button { background: rgba(255,255,255,.14); border: 0; color: #fff; border-radius: 4px; padding: 4px 8px; font-weight: 600; font-size: 12.5px; }
 
+/* dark theme */
+:scope[data-theme="dark"] .ribbon { border-bottom: 1px solid var(--cqa-border-hairline); }
+:scope[data-theme="dark"] .rb-action .btn-primary { color: #06140C; }
+:scope[data-theme="dark"] .tcell + .tcell { border-color: var(--cqa-border-hairline); }
 /* dark theme: neon surfaces need dark text for contrast */
 :scope[data-theme="dark"] .btn-primary, :scope[data-theme="dark"] .option.on, :scope[data-theme="dark"] .recalc:not(.neutral) { color: #03130A; }
 :scope[data-theme="dark"] .btn-primary:hover:not(:disabled) { background: var(--cqa-brand-hover); }
@@ -696,6 +706,7 @@ p { margin: 0; }
   --cqa-d365-bar: #0B1A2E;
   --cqa-bar-good: #009951;
   --cqa-bar-low: #EF4444;
+  --cqa-bar-track: #E8EDEA;
   --cqa-ribbon: 52px;
   --cqa-chrome: 52px;
   --cqa-shadow: none;
@@ -758,7 +769,7 @@ p { margin: 0; }
 /* criteria chart and triage, as in the mockup */
 .cchart .ok { fill: var(--cqa-bar-good); }
 .cchart .fail { fill: var(--cqa-bar-low); }
-.cchart .trk { fill: #E8EDEA; }
+.cchart .trk { fill: var(--cqa-bar-track); }
 .legend-inline i.ok { background: var(--cqa-bar-good); }
 .legend-inline i.fail { background: var(--cqa-bar-low); }
 .v3-split { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; margin-top: 12px; }
@@ -813,7 +824,8 @@ p { margin: 0; }
   :scope.cqa-host-on .cqa-app { margin: 0; border: 0; box-shadow: none; overflow: visible; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
-  .rb-title, .bridge-badge, .theme-toggle { display: none !important; }
+  .rb-title, .bridge-badge { display: none !important; }
+  .theme-toggle { width: 34px; padding: 0; justify-content: center; }
   .page-head { padding: 12px 14px; min-height: 0; }
   .v3-split { grid-template-columns: 1fr; }
   .tri-row { grid-template-columns: minmax(0, 1fr) auto auto; }
@@ -834,7 +846,7 @@ p { margin: 0; }
   .tabbar .tab-icon { position: relative; width: 52px; height: 28px; display: grid; place-items: center; border-radius: 14px; }
   .tabbar a.active .tab-icon { background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
   .tabbar .dot { position: absolute; top: -3px; right: 8px; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 9px; background: var(--cqa-critical-accent); color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; border: 2px solid var(--cqa-bg-surface); }
-  :scope[data-theme="dark"] .tabbar { background: rgba(12, 20, 16, .94); }
+  :scope[data-theme="dark"] .tabbar { background: rgba(27, 30, 34, .95); }
   .theme-toggle .lbl { display: none; }
   .tabbar .tab-label { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 
