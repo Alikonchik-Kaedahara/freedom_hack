@@ -32,6 +32,9 @@ export function renderChecklists(root, id) {
   };
   const syncSave = () => { if (saveBtn) saveBtn.disabled = !(dirty && isValid()); };
   const draw = () => page.replaceChildren(...build());
+  // A field's change event fires on blur — i.e. while the user is clicking a button. Redrawing at once
+  // would replace that button before the click lands, so the redraw waits for the click to finish.
+  const redrawLater = () => setTimeout(draw, 0);
   draw();
   const off = subscribe((w) => { if (w === 'results' || w === 'job' || w === 'settings') draw(); });
   return off;
@@ -56,7 +59,7 @@ export function renderChecklists(root, id) {
     // ----- left: criteria -----
     const isActive = state.settings?.active?.[draft.channel] === draft.id;
     const meta = h('div', { class: 'cl-meta' },
-      h('input', { class: 'name-input', value: draft.name, oninput: (e) => { draft.name = e.target.value; dirty = true; syncSave(); }, onchange: draw }),
+      h('input', { class: 'name-input', value: draft.name, oninput: (e) => { draft.name = e.target.value; dirty = true; syncSave(); }, onchange: redrawLater }),
       h('select', { class: 'select', onchange: (e) => { draft.channel = e.target.value; markDirty(); } },
         Object.entries(CHANNELS).map(([v, l]) => h('option', { value: v, selected: draft.channel === v ? 'selected' : null }, l))),
       isActive ? h('span', { class: 'tag green tag-lg' }, icon('check', 14), 'Основной')
@@ -109,10 +112,10 @@ export function renderChecklists(root, id) {
     const listId = `sections-${draft.id}`;
     const body = h('div', { class: 'crow-body' },
       h('div', { class: 'field' }, h('label', null, 'Название'),
-        h('input', { class: 'input', value: c.name, oninput: (e) => set('name', e.target.value), onchange: draw })),
+        h('input', { class: 'input', value: c.name, oninput: (e) => set('name', e.target.value), onchange: redrawLater })),
       h('div', { class: 'field-row', style: { gridTemplateColumns: '110px 1fr 1fr' } },
         h('div', { class: 'field' }, h('label', null, 'Номер'),
-          h('input', { class: 'input', value: c.code || '', oninput: (e) => set('code', e.target.value), onchange: draw })),
+          h('input', { class: 'input', value: c.code || '', oninput: (e) => set('code', e.target.value), onchange: redrawLater })),
         h('div', { class: 'field' }, h('label', null, 'Раздел'),
           h('input', { class: 'input', value: c.section || '', list: listId, oninput: (e) => set('section', e.target.value) }),
           h('datalist', { id: listId }, sections.map((s) => h('option', { value: s })))),
@@ -133,7 +136,7 @@ export function renderChecklists(root, id) {
           h('span', { class: 'track' }), 'Разрешить N/A'),
         c.naAllowed ? h('textarea', { class: 'textarea', rows: 2, value: c.naRule || '', placeholder: 'Условие N/A: когда критерий неприменим', oninput: (e) => set('naRule', e.target.value) }) : null) : null,
       // Why we read an ambiguous rule this way. Shown to reviewers in the card; the model gets only the rule.
-      h('div', { class: 'field interp-field' }, h('label', null, 'Наша трактовка ', h('span', { class: 'hint' }, 'почему правило читаем именно так — видно проверяющему, модели не передаётся')),
+      h('div', { class: 'field interp-field' }, h('label', null, 'Наша трактовка ', h('span', { class: 'hint' }, 'почему правило читаем именно так — видно проверяющему, в автоматическую оценку не передаётся')),
         h('textarea', { class: 'textarea', rows: 3, value: c.interpretation || '', placeholder: 'Например: приветствие бота оператору не засчитывается, потому что…', oninput: (e) => set('interpretation', e.target.value) })),
       h('div', null, h('button', { class: 'link-btn danger', type: 'button', onclick: () => {
         draft.criteria = draft.criteria.filter((x) => x !== c); openRows.delete(c.id); markDirty();
