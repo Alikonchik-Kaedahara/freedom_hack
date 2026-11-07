@@ -47,7 +47,7 @@ async function openEditor(record, result, criterion, times) {
     engine === 'cloud' ? 'Предложить с ИИ · Claude' : 'Предложить с ИИ · локальная модель');
   const save = h('button', { type: 'button', class: 'btn btn-primary', disabled: !input.value.trim(), onclick: approve }, 'Сохранить рекомендацию');
   const editor = openModal({
-    title: 'Рекомендация проверяющего', sub: `${criterion.code} · ${criterion.name}`,
+    title: 'Рекомендация проверяющего', sub: `${criterion.code} · ${criterion.name}`, className: 'coaching-modal',
     body: h('div', { class: 'coaching-editor' },
       h('label', { class: 'field' }, 'Исходная реплика', turnPicker), quote,
       h('label', { class: 'field' }, 'Рекомендация оператору', input),

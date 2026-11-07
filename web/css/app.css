@@ -1425,6 +1425,10 @@ from { transform: translateY(100%); }
 #cqa-d365-root .rb-name { display: none; }
 }
 #cqa-d365-root .coaching-editor { display: grid; gap: 10px; }
+#cqa-d365-root .coaching-modal { display: flex; flex-direction: column; overflow: hidden; }
+#cqa-d365-root .coaching-modal .modal-head,
+#cqa-d365-root .coaching-modal .modal-foot { flex: none; }
+#cqa-d365-root .coaching-modal .modal-body { overflow-y: auto; min-height: 0; }
 #cqa-d365-root .coaching-editor .select { width: 100%; min-width: 0; }
 #cqa-d365-root .coaching-editor .review-quote { overflow-wrap: anywhere; }
 #cqa-d365-root .coaching-editor > .btn { justify-self: start; }

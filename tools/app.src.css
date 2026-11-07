@@ -1450,6 +1450,9 @@ a.q-line:hover b { text-decoration: underline; }
 }
 
 .coaching-editor { display: grid; gap: 10px; }
+.coaching-modal { display: flex; flex-direction: column; overflow: hidden; }
+.coaching-modal .modal-head, .coaching-modal .modal-foot { flex: none; }
+.coaching-modal .modal-body { overflow-y: auto; min-height: 0; }
 .coaching-editor .select { width: 100%; min-width: 0; }
 .coaching-editor .review-quote { overflow-wrap: anywhere; }
 .coaching-editor > .btn { justify-self: start; }
