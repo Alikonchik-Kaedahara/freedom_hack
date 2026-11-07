@@ -97,6 +97,14 @@ def static_files(path):
     return send_from_directory(WEB, path)
 
 
+@app.after_request
+def no_stale_ui(resp):
+    # The interface is plain ES modules: browsers would otherwise keep an old app.js for days after a deploy.
+    if resp.mimetype in ("text/html", "text/css", "application/javascript", "text/javascript"):
+        resp.headers["Cache-Control"] = "no-cache"
+    return resp
+
+
 # ---------- datasets ----------
 
 @app.get("/api/datasets")
@@ -244,10 +252,22 @@ def engine_status():
 
 # ---------- results & appeals ----------
 
+def _with_operators(results, group_id):
+    """Add the operator's name to each result (from the first operator reply, or the supervisor's override)."""
+    if not group_id:
+        return results
+    records = {r["conversation_id"]: r for r in storage.get_dataset(group_id)}
+    for res in results.values():
+        rec = records.get(res.get("conversationId"))
+        if rec:
+            res["operator"] = operators.operator_of(rec, res)
+    return results
+
+
 @app.get("/api/results")
 def results():
     group_id = request.args.get("group")
-    return jsonify(storage.get_results(group_id))
+    return jsonify(_with_operators(storage.get_results(group_id), group_id))
 
 
 @app.get("/api/results/<path:key>")

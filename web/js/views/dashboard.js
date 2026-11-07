@@ -48,18 +48,18 @@ function build() {
 
   // ----- telemetry strip -----
   const pct = recs.length ? evaluated.length / recs.length : 0;
-  const usage = costInfo(evaluated);
+  const ops = operatorStats(evaluated);
   const strip = h('div', { class: 'card tstrip' },
     cell('Средний балл', h('span', { class: 'val' }, h('span', { class: `score ${scoreClass(avg)}` }, fmtScore(avg)), h('small', null, '/ 100')),
       avg == null ? 'нет оценок' : `по ${totals.length} ${pluralRu(totals.length, 'диалогу', 'диалогам', 'диалогам')}`),
     cell('Проверено диалогов', h('span', { class: 'val' }, evaluated.length, h('small', null, `из ${recs.length}`)),
       h('div', { class: 'stack-foot' }, progressSvg(pct), h('span', null, `${chats} ${pluralRu(chats, 'чат', 'чата', 'чатов')} · ${calls} ${pluralRu(calls, 'звонок', 'звонка', 'звонков')}`)), { stack: true }),
-    cell(['Грубые ошибки', h('span', { class: 'mono' }, ' · Крит. 08')], h('span', { class: 'val' }, gross),
+    cell('Грубые ошибки', h('span', { class: 'val' }, gross),
       gross ? `${gross} ${pluralRu(gross, 'диалог', 'диалога', 'диалогов')} · нулевая терпимость` : 'не выявлено', { cls: gross ? 'danger' : 'ok' }),
     cell('Апелляции', h('span', { class: 'val', style: { color: pending ? 'var(--cqa-warn-text)' : 'var(--cqa-text-muted)' } }, `${pending} / ${resolved}`),
       pending ? `ждут решения · решено ${resolved}` : 'решено, новых нет'),
-    cell('Расход токенов / Модель', h('span', { class: 'val' }, usage.perDialog != null ? `$${usage.perDialog.toFixed(3)}` : '—', h('small', null, 'за диалог')),
-      usage.model ? `${usage.model} — всего $${usage.total.toFixed(2)} · ${fmtTokens(usage.tokens)}` : modelName()));
+    cell('Операторы', h('span', { class: 'val' }, ops.total, ops.total ? h('small', null, ops.below ? `· ${ops.below} ниже цели` : '· все выше цели') : null),
+      ops.total ? h('a', { href: '#/operators', class: 'link-btn' }, ops.weakest ? `Самый низкий балл: ${ops.weakest}` : 'Открыть профили') : 'появятся после оценки'));
 
   if (!evaluated.length) {
     const first5 = pendingIds.slice(0, 5);
@@ -95,24 +95,31 @@ function modelName() {
   const s = state.settings;
   if (!s) return '—';
   if (s.engine === 'local') return `Локальная · ${s.local?.model || ''}`;
-  if (s.engine === 'replay') return 'Replay · без вызова модели';
+  if (s.engine === 'replay') return 'сохранённые оценки, без модели';
   return MODEL_LABEL[s.cloud?.model] || s.cloud?.model || 'Claude';
 }
 
-function costInfo(evaluated) {
-  let total = 0, tokens = 0, n = 0; const models = new Map();
+/** Operators of the evaluated dialogs: how many, how many average below the target, who is weakest. */
+function operatorStats(evaluated) {
+  const per = new Map();
   for (const r of evaluated) {
     const res = resultFor(r.conversation_id);
-    const u = res?.usage || {};
-    if (res?.engine?.model) models.set(res.engine.model, (models.get(res.engine.model) || 0) + 1);
-    if (u.costUsd != null) { total += u.costUsd; n += 1; }
-    tokens += (u.inputTokens || 0) + (u.outputTokens || 0);
+    const name = res?.operator;
+    const total = summaryFor(r.conversation_id)?.total;
+    if (!name || name === 'Не представился' || total == null) continue;
+    const p = per.get(name) || { sum: 0, n: 0 };
+    p.sum += total; p.n += 1;
+    per.set(name, p);
   }
-  const top = [...models.entries()].sort((a, b) => b[1] - a[1])[0]?.[0];
-  return { total, tokens, perDialog: n ? total / n : null, model: top ? (MODEL_LABEL[top] || top) : null };
+  let weakest = null, min = Infinity, below = 0;
+  for (const [name, p] of per) {
+    const avg = p.sum / p.n;
+    if (avg < TARGET) below += 1;
+    if (avg < min) { min = avg; weakest = name; }
+  }
+  return { total: per.size, below, weakest };
 }
 
-const fmtTokens = (t) => (t >= 1e6 ? `${(t / 1e6).toFixed(1)}M токенов` : t >= 1e3 ? `${Math.round(t / 1e3)}K токенов` : `${t} токенов`);
 
 function criteriaCard(evaluated) {
   // Average share of the criterion's weight earned, plus how often it was N/A (chats and calls together).
@@ -194,7 +201,7 @@ function triageCard(evaluated) {
             h('span', { class: 'meta' }, `${channelLabel(r.channel)} · ${r.language}`)),
           h('div', { class: 'why', title: why }, why)),
         h('span', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total)),
-        h('a', { class: 'go', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Разбор →'),
+        h('a', { class: 'go', href: `#/dialog/${encodeURIComponent(r.conversation_id)}` }, 'Открыть'),
         kind === 'gross' ? h('span', { class: 'flag08', title: 'Грубая ошибка, критерий 08' }, icon('alert', 13), '08')
           : kind === 'appeal' ? h('span', { class: 'flag08 soft', title: 'Апелляция ждёт решения' }, icon('scale', 13))
             : kind === 'disputed' ? h('span', { class: 'flag08 soft', title: 'Спорный критерий' }, icon('alert', 13), '?')

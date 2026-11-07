@@ -56,6 +56,8 @@ function setResults(results) {
 }
 
 export function putResult(result) {
+  // single-result responses carry no operator name; keep the one the list gave us
+  if (result.operator == null && state.results[result.key]?.operator != null) result.operator = state.results[result.key].operator;
   state.results[result.key] = result;
   state.summaries[result.key] = summarize(result);
   emit('results');

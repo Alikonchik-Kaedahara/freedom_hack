@@ -22,7 +22,7 @@ const NAV = [
   { path: '/dialogs', label: 'Диалоги', short: 'Диалоги', icon: 'list', rail: 'clockR' },
   { path: '/appeals', label: 'Апелляции', short: 'Апелляции', icon: 'scale', rail: 'bookmark', badge: () => pendingAppeals().length },
   { path: '/checklists', label: 'Чек-листы', short: 'Чек-листы', icon: 'checks', rail: 'headset' },
-  { path: '/model', label: 'AI-Модель', short: 'Модель', icon: 'cpu', rail: 'gear', more: true },
+  { path: '/model', label: 'Настройки', short: 'Настройки', icon: 'gear', rail: 'gear', more: true },
   { path: '/quality', label: 'Качество', short: 'Качество', icon: 'target', more: true },
   { path: '/operators', label: 'Операторы', short: 'Операторы', icon: 'headset', more: true },
   { path: '/knowledge', label: 'Справочник', short: 'Справочник', icon: 'database', more: true },
@@ -64,7 +64,7 @@ function buildShell(root) {
   ui.theme = h('button', { class: 'theme-toggle', type: 'button', title: 'Светлая / тёмная тема', 'aria-label': 'Светлая / тёмная тема' }, icon('contrast', 15));
   ui.action = h('div', { class: 'rb-action' });
   ui.bridge = h('span', { class: 'bridge-badge', hidden: true });
-  ui.right = h('div', { class: 'rb-right' }, ui.bridge, ui.pill, ui.host, ui.theme, ui.action);
+  ui.right = h('div', { class: 'rb-right' }, ui.pill, ui.theme, ui.action);
   ui.rail = h('nav', { class: 'cqa-d365-rail', 'aria-label': 'Разделы CQA' });
   ui.view = h('div', { class: 'cqa-view' });
   ui.tabbar = h('nav', { class: 'tabbar', 'aria-label': 'Разделы CQA' });
@@ -102,6 +102,17 @@ function setTheme(theme, persist = true) {
   ui.theme.setAttribute('aria-pressed', String(theme === 'dark'));
   if (persist) writePref(THEME_KEY, theme);
 }
+
+/** Settings page: the Dynamics 365 frame on/off and the integration status line. */
+export const hostFrame = {
+  get on() { return ui.root?.classList.contains('cqa-host-on') ?? true; },
+  set(on) { setHostPreview(on); },
+  get embedded() { return D365Bridge.ready && !D365Bridge.simulated; },
+  get status() {
+    if (D365Bridge.ready && !D365Bridge.simulated) return 'Приложение запущено внутри Dynamics 365.';
+    return 'Приложение запущено отдельно от Dynamics 365. Рамка рабочего пространства показывает, как оно выглядит встроенным в CRM.';
+  },
+};
 
 function setHostPreview(on, persist = true) {
   ui.root.classList.toggle('cqa-host-on', on);

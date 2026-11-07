@@ -33,18 +33,18 @@ export function renderKnowledge(root) {
     const hits = Object.values(usage).reduce((a, u) => a + u.dialogs.length, 0);
     const head = h('div', { class: 'page-head' },
       h('div', null, h('h1', null, 'Справочник фактов'),
-        h('div', { class: 'sub' }, `${doc.facts.length} ${pluralRu(doc.facts.length, 'факт', 'факта', 'фактов')} · модель получает их вместе с критерием консультации и помечает противоречия · ${hits ? `${hits} ${pluralRu(hits, 'противоречие', 'противоречия', 'противоречий')} в наборе ${state.group}` : 'противоречий в наборе не найдено'}`)),
+        h('div', { class: 'sub' }, `${doc.facts.length} ${pluralRu(doc.facts.length, 'факт', 'факта', 'фактов')} о продуктах и сервисах · при оценке консультации ответы оператора сверяются с ними · ${hits ? `${hits} ${pluralRu(hits, 'противоречие', 'противоречия', 'противоречий')} в наборе ${state.group}` : 'противоречий в наборе не найдено'}`)),
       h('div', { class: 'head-actions' },
         edited ? h('button', { class: 'btn btn-ghost', type: 'button', onclick: reset }, 'Вернуть исходный') : null,
-        h('button', { class: 'btn btn-secondary', type: 'button', onclick: addFact }, icon('plus', 15), 'Факт'),
+        h('button', { class: 'btn btn-secondary', type: 'button', onclick: addFact }, icon('plus', 15), 'Добавить факт'),
         h('button', { class: `btn btn-primary ${dirty ? '' : 'is-quiet'}`, type: 'button', disabled: !dirty, onclick: save }, icon('check', 15), 'Сохранить')));
 
     const how = h('div', { class: 'card card-pad kb-how' },
       h('div', { class: 'kb-how-grid' },
-        step('1', 'Факт', 'Короткое утверждение о продукте: где лежит отчёт, что такое D-счёт, когда нужна идентификация. Без сценариев и скриптов — только то, что можно проверить.'),
-        step('2', 'Оценка', 'Модель видит факты рядом с критерием «Корректность консультации». Если оператор сказал иное — возвращает идентификаторы фактов в поле contradicts и объясняет расхождение.'),
-        step('3', 'Карточка', 'В карточке диалога у критерия появляется плашка «Противоречит справочнику» с текстом факта. Балл по-прежнему ставится по правилу и шкале чек-листа — справочник объясняет, а не оценивает.')),
-      h('div', { class: 'muted small', style: { marginTop: '10px' } }, doc.note || 'В проде список заменяется базой знаний и скриптами компании; формат тот же — id, тема, факт, источник.'));
+        step('1', 'Факт', 'Короткое утверждение о продукте: где лежит отчёт брокера, что такое D-счёт, когда нужна идентификация. Только то, что можно проверить, — без сценариев разговора.'),
+        step('2', 'Проверка', 'При оценке критерия «Корректность консультации» ответы оператора сверяются со справочником. Если оператор сказал иное, расхождение фиксируется с указанием факта.'),
+        step('3', 'Карточка', 'У критерия в карточке диалога появляется пометка «Противоречит справочнику» с текстом факта. Балл при этом ставится по правилу и шкале чек-листа — справочник объясняет, а не оценивает.')),
+      h('div', { class: 'muted small', style: { marginTop: '10px' } }, doc.note || 'Справочник ведёт отдел качества: источник факта — регламент, инструкция или база знаний компании.'));
 
     const meta = h('div', { class: 'card card-pad' },
       h('div', { class: 'field-row' },
@@ -111,7 +111,7 @@ export function renderKnowledge(root) {
   function reset() {
     const { close } = openModal({
       title: 'Вернуть исходный справочник?',
-      body: h('p', null, 'Правки будут удалены, вернутся факты, извлечённые из набора DEV.'),
+      body: h('p', null, 'Ваши правки будут удалены, вернётся исходный список фактов.'),
       footer: [h('button', { class: 'btn btn-ghost', onclick: () => close() }, 'Отмена'),
         h('button', { class: 'btn btn-danger', onclick: async () => { try { await api.resetKnowledge(); await refreshKnowledge(); close(); await load(); toast('Справочник восстановлен'); } catch (e) { toast(e.message, { type: 'error' }); } } }, 'Вернуть')],
     });

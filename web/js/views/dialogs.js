@@ -129,11 +129,11 @@ export function renderDialogs(root) {
       type: 'checkbox', class: 'cb', checked: allSel, 'aria-label': 'Выбрать все',
       onclick: (e) => { e.stopPropagation(); rows.forEach((r) => (allSel ? selected.delete(r.conversation_id) : selected.add(r.conversation_id))); drawRows(); drawHead(); },
     });
-    tbodyHost.replaceChildren(h('table', { class: 'table' },
+    tbodyHost.replaceChildren(h('table', { class: 'table registry' },
       h('thead', null, h('tr', null,
         h('th', { style: { width: '44px' } }, headCb),
-        h('th', null, 'ID'), h('th', null, 'Канал'), h('th', null, 'Язык'),
-        h('th', null, 'Матрица 01–08'),
+        h('th', null, 'ID'), h('th', null, 'Оператор'), h('th', null, 'Канал'), h('th', null, 'Язык'),
+        h('th', null, 'Критерии 01–08'),
         h('th', { class: 'right' }, 'Балл'), h('th', null, 'Статус'), h('th', null, ''))),
       h('tbody', null, rows.map(row))));
     footHost.replaceChildren(h('div', { class: 'table-foot' },
@@ -163,11 +163,12 @@ export function renderDialogs(root) {
     const open = () => (location.hash = `#/dialog/${encodeURIComponent(cid)}`);
     const m = matchOf(r);
     const act = s
-      ? h('button', { class: 'btn btn-secondary btn-xs', onclick: (e) => { e.stopPropagation(); open(); } }, 'Открыть →')
+      ? h('button', { class: 'btn btn-secondary btn-xs', onclick: (e) => { e.stopPropagation(); open(); } }, 'Открыть')
       : h('button', { class: 'btn btn-secondary btn-xs', disabled: running || state.job?.status === 'running', onclick: (e) => { e.stopPropagation(); startEvaluation([cid]); } }, 'Оценить');
     return h('tr', { class: `${s?.gross ? 'critical' : ''} ${selected.has(cid) ? 'selected' : ''}`, onclick: open },
       h('td', null, cb),
       h('td', null, h('span', { class: 'id' }, cid), m?.text ? h('div', { class: 'match-hint' }, snippet(m)) : null),
+      h('td', null, operatorCell(cid)),
       h('td', null, h('span', { class: 'chan' }, icon(channelIcon(r.channel), 14), channelLabel(r.channel))),
       h('td', null, h('span', { class: 'tag outline' }, r.language)),
       h('td', null, matrix(cid)),
@@ -204,4 +205,12 @@ function matrix(cid) {
     return h('i', { class: cls, title: `${c.code} ${c.name}: ${MX_TITLE[st] || st}` }, st === 'na' ? '–' : '');
   });
   return h('span', { class: 'mx' }, cells, sc.gross ? h('span', { class: 'shield', title: 'Грубая ошибка (08)' }, icon('shield', 15)) : null);
+}
+
+/** Operator of an evaluated dialog (from the first reply, or set by the supervisor); unknown until evaluated. */
+function operatorCell(cid) {
+  const name = resultFor(cid)?.operator;
+  if (!name) return h('span', { class: 'muted' }, '—');
+  if (name === 'Не представился') return h('span', { class: 'muted', title: 'В первой реплике оператор не назвал себя' }, 'Не представился');
+  return h('a', { class: 'op-link', href: `#/operators/${encodeURIComponent(name)}`, onclick: (e) => e.stopPropagation() }, name);
 }

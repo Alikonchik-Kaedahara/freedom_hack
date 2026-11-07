@@ -36,7 +36,7 @@ export function renderQuality(root) {
     setRibbonAction(null);
     const head = h('div', { class: 'page-head' },
       h('div', null, h('h1', null, 'Качество оценки'),
-        h('div', { class: 'sub' }, 'Насколько модель совпадает с людьми, с собой и как часто её поправляют проверяющие')),
+        h('div', { class: 'sub' }, 'Насколько автоматическая оценка совпадает с ручной, воспроизводится при повторе и как часто её пересматривают проверяющие')),
       h('div', { class: 'head-actions' }, secondAllButton()));
     if (loading && !data) { page.replaceChildren(head, h('div', { class: 'skeleton', style: { height: '180px' } })); return; }
     if (!data) { page.replaceChildren(head, h('div', { class: 'card card-pad muted' }, 'Нет данных')); return; }
@@ -85,8 +85,8 @@ export function renderQuality(root) {
       return h('div', { class: 'card card-pad' },
         h('h3', { class: 'card-title q-title' }, 'Совпадение с ручной разметкой', h('span', { class: 'spacer' }), upload, file),
         h('div', { class: 'empty-inline' },
-          h('p', null, 'Эталона у организаторов нет: команда размечает 12 чатов по чек-листу независимо, сводит консенсус и сравнивает с моделью по каждому критерию — так же, как организаторы сравнивают с экспертной оценкой.'),
-          h('p', { class: 'muted' }, 'Принимается файл Калибровка_CQA.xlsx (лист «Разметка», столбец «Итог (консенсус)») или JSON {entries: [{conversationId, criterionCode, value}]}. Протокол — docs/todo/КАЛИБРОВКА.md.')));
+          h('p', null, 'Разметьте выборку диалогов вручную по тому же чек-листу — несколько проверяющих независимо, затем общий итог — и загрузите таблицу. Система сравнит ваши ответы с оценкой модели по каждому критерию и покажет, где они расходятся.'),
+          h('p', { class: 'muted' }, 'Принимается таблица Excel с листом «Разметка» и столбцом «Итог (консенсус)» либо JSON со списком entries: conversationId, criterionCode, value.')));
     }
     const langs = h('div', { class: 'seg-mini' }, c.perLanguage.map((l) => h('span', { class: `tag outline q-tag-${tone(l.rate)}` }, `${l.language} ${pct(l.rate)} · ${l.agree}/${l.total}`)));
     const rows = c.perCriterion.map((p) => h('tr', null,

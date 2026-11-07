@@ -4,7 +4,7 @@ import { api } from '../api.js';
 import { state, loadGroup, refreshDatasets } from '../store.js';
 
 function importCard({ onOpen, initial = 'DEV' } = {}) {
-  const input = h('input', { class: 'input input-lg', value: initial, spellcheck: 'false', autocomplete: 'off', placeholder: 'DEV, SAMPLE…' });
+  const input = h('input', { class: 'input input-lg', value: initial, spellcheck: 'false', autocomplete: 'off', placeholder: 'Код набора, например DEV' });
   const btn = h('button', { class: 'btn btn-primary btn-lg', type: 'submit' }, icon('download', 18), 'Загрузить');
   const result = h('div');
 
@@ -48,7 +48,7 @@ function importCard({ onOpen, initial = 'DEV' } = {}) {
     },
   },
   h('div', { class: 'import-row' },
-    h('div', { class: 'input-prefix' }, h('span', null, 'group_id'), input),
+    h('div', { class: 'input-prefix' }, h('span', null, 'Набор'), input),
     btn),
   result);
 
@@ -71,7 +71,7 @@ function importCard({ onOpen, initial = 'DEV' } = {}) {
   const uploadRow = h('div', { class: 'upload-row' },
     'или',
     h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => file.click() }, icon('upload', 16), 'Загрузить файл с транскриптами'),
-    h('span', null, '· group_id SAMPLE — демо-набор'),
+    h('span', null, '· для знакомства с системой есть демонстрационный набор SAMPLE'),
     file);
 
   setTimeout(() => input.focus(), 50);
@@ -81,8 +81,8 @@ function importCard({ onOpen, initial = 'DEV' } = {}) {
 export function renderImportStage(root) {
   root.append(h('div', { class: 'import-stage' },
     h('div', { class: 'card import-card' },
-      h('h2', null, 'Импорт диалогов'),
-      h('p', { class: 'muted' }, 'group_id набора из API организаторов: DEV — разработка, контрольный ключ выдают на 23-м часе.'),
+      h('h2', null, 'Загрузка диалогов'),
+      h('p', { class: 'muted' }, 'Укажите код набора из системы записи разговоров — чаты и звонки подтянутся автоматически — или загрузите файл с транскриптами.'),
       importCard())));
 }
 
@@ -90,7 +90,7 @@ export function renderImportStage(root) {
 let openPopover = null;
 export function openDatasetPopover(anchor) {
   if (openPopover) { openPopover.close(); return; }
-  const input = h('input', { class: 'input mono', placeholder: 'group_id, например DEV', spellcheck: 'false', autocomplete: 'off' });
+  const input = h('input', { class: 'input', placeholder: 'Код набора, например DEV', spellcheck: 'false', autocomplete: 'off' });
   const status = h('div', { class: 'pop-status' });
   const go = h('button', { class: 'btn btn-primary btn-sm', type: 'submit' }, 'Загрузить');
   const list = state.datasets.length ? [...state.datasets].reverse().map((d) =>
@@ -123,7 +123,7 @@ export function openDatasetPopover(anchor) {
   const el = h('div', { class: 'cqa-popover', role: 'dialog', 'aria-label': 'Набор диалогов' },
     h('div', { class: 'pop-title' }, 'Набор диалогов'), list,
     h('div', { class: 'pop-sep' }),
-    h('div', { class: 'pop-title' }, 'Загрузить по group_id'), form);
+    h('div', { class: 'pop-title' }, 'Загрузить другой набор'), form);
   el.addEventListener('click', (e) => e.stopPropagation());
   anchor.append(el);
   const onDoc = () => close();

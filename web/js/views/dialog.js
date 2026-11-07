@@ -129,7 +129,7 @@ export function renderDialog(root, cid) {
         h('button', { class: 'back-btn', onclick: () => history.length > 1 ? history.back() : (location.hash = '#/dialogs'), 'aria-label': 'Назад' }, icon('back', 17)),
         h('div', null,
           h('h1', null, 'Диалог ', h('span', { class: 'mono' }, cid)),
-          h('div', { class: 'sub' }, `${channelLabel(rec.channel)} · ${rec.language}`))),
+          h('div', { class: 'sub' }, `${channelLabel(rec.channel)} · ${rec.language}${res?.operator ? ` · оператор ${res.operator}` : ''}`))),
       h('div', { class: 'head-actions' },
         res ? h('a', { class: 'btn btn-glass', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank', rel: 'noopener', title: 'Отчёт для печати / PDF' },
           icon('download', 15), h('span', { class: 'btn-label' }, 'Отчёт')) : null,
@@ -203,7 +203,7 @@ export function renderDialog(root, cid) {
     for (const i of ev) msgEls[i]?.classList.add('gross');
     bannerHost.replaceChildren(h('div', { class: 'gross-banner' },
       h('div', { class: 'gb-icon' }, icon('shield', 24)),
-      h('div', null, h('b', null, 'ВНИМАНИЕ: ГРУБАЯ ОШИБКА'), h('span', null, fa[crit.id]?.explanation || crit.name)),
+      h('div', null, h('b', null, 'Грубая ошибка'), h('span', null, fa[crit.id]?.explanation || crit.name)),
       ev.length ? h('button', { class: 'btn btn-glass btn-sm', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true); } }, 'Показать') : null));
   }
 
@@ -278,11 +278,11 @@ export function renderDialog(root, cid) {
       ans?.explanation ? h('div', { class: 'expl' }, ans.explanation) : null,
       dispute ? h('div', { class: `dispute ${dispute.cls}` },
         icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
-      ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность модели: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
+      ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность оценки: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
       secondOpinionNote(res, c),
       knowledgeNote(ans),
       interpretationOf(res, c) ? h('details', { class: 'interp' },
-        h('summary', null, icon('checks', 13), 'Наша трактовка правила'),
+        h('summary', null, icon('checks', 13), 'Как читается это правило'),
         h('div', { class: 'interp-body' }, interpretationOf(res, c))) : null,
       ev.length ? h('div', null,
         h('div', { class: 'ev-label' }, evLabel),

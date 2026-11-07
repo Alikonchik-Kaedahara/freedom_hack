@@ -389,11 +389,11 @@ def check_engine(settings):
         from . import replay
         n = replay.count_saved()
         if not n:
-            return {"ok": False, "message": "Нет сохранённых ответов: загрузите demo/sample или выполните python manage.py snapshot", "saved": 0}
+            return {"ok": False, "message": "Сохранённых оценок пока нет — выберите облачную модель или модель на своём сервере", "saved": 0}
         return {"ok": True, "message": f"Сохранённых ответов: {n}", "saved": n}
     import os
     has_key = bool(settings.get("cloud", {}).get("apiKey") or os.environ.get("ANTHROPIC_API_KEY"))
-    return {"ok": has_key, "message": "Ключ API задан" if has_key else "Нужен ключ Claude API"}
+    return {"ok": has_key, "message": "Ключ API подключён" if has_key else "Укажите ключ API, чтобы начать оценку"}
 
 
 # ---------- main entry ----------
