@@ -934,6 +934,48 @@ p { margin: 0; }
 .gross-banner .gb-icon::after { animation: none; }
 .host-toggle { display: none !important; }
 
+/* ============ v5 · 1. Visual style (ТЗ «интерфейс как готовый продукт») ============ */
+/* One accent — Freedom green; everything else neutral. No shadows, glows or terminals. */
+:scope {
+  --cqa-brand-primary: #009951;
+  --cqa-brand-hover: #007F43;
+  --cqa-brand-action: #009951;
+  --cqa-bg-canvas: #F3F5F4;
+  --cqa-bg-surface: #FFFFFF;
+  --cqa-border-hairline: #DDE3E0;
+  --cqa-text-primary: #111816;
+  --cqa-text-secondary: #4C5B54;
+  --cqa-text-muted: #7B8A82;
+  --cqa-pass-text: #047857; --cqa-pass-bg: #ECFDF5;
+  --cqa-warn-text: #B45309; --cqa-warn-bg: #FFFBEB;
+  --cqa-fail-text: #B91C1C; --cqa-fail-bg: #FEF2F2;
+  --cqa-font-sans: "Inter", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+  --cqa-shadow: none;
+  --cqa-shadow-pop: 0 0 0 1px var(--cqa-border-strong);
+  font-size: 13.5px;
+}
+:scope[data-theme="dark"] { --cqa-shadow-pop: 0 0 0 1px var(--cqa-border-strong); --cqa-brand-action: #2FBF71; }
+.card, .crit.open, .crow.open, .engine, .toast, .job-dock, .cqa-popover, .modal { box-shadow: none; }
+.modal, .cqa-popover { border: 1px solid var(--cqa-border-strong); }
+.card { border-radius: 6px; }
+.card-pad { padding: 14px 16px; }
+.card-title { font-size: 15px; font-weight: 600; }
+.page-head h1 { font-size: 20px; font-weight: 700; }
+.page-head .sub, .muted, .field > label, .tcell .foot { font-size: 12px; }
+.grid, .v3-split { gap: 12px; }
+.btn, .input, .select, .textarea, .chip, .option { border-radius: 4px; }
+.table td { height: 40px; padding-top: 6px; padding-bottom: 6px; }
+/* monospace only for dialog IDs and timecodes */
+.ds-pill .mono, .ds-pill, .mx i, .rb-tabs .badge, .cqa-d365-rail .badge, .tabbar .dot, .appeal-row .code-badge, .appeal-row .s,
+.recalc, .step .input:first-child, .alloc text, .player .speed, .segmented .count, .weight .wnum, .crow-head .code,
+.crit-head .nm small, .tcell .lbl .mono, .rb-badge { font-family: var(--cqa-font-sans); font-variant-numeric: tabular-nums; letter-spacing: 0; }
+.id, .table .id, .tri-row .line .id, .triage .id, .msg .meta .t, .ev, .player .time, .mono-id { font-family: var(--cqa-font-mono); }
+/* no capitals anywhere */
+.table th, .pop-title, .sec-title, .gross-banner b, .rb-brand .word b, .rb-brand .word small { text-transform: none; }
+/* no glow, no pulse */
+.rb-tabs a.active::after { box-shadow: none; }
+.gross-banner .gb-icon::after { animation: none; box-shadow: none; }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
