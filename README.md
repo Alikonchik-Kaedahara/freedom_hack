@@ -83,11 +83,15 @@ git add results/prod/results.json && git commit -m "Control set results" && git 
 
 ## Деплой
 
+**Публичный адрес:** https://web-production-a39c80.up.railway.app (Railway, деплой автоматически из ветки `main`).
+
 Проект готов к хостингу с поддержкой `Procfile` (Railway, Render, Heroku-подобные):
 
 - команда запуска: `gunicorn server:app --workers 1 --threads 8 --timeout 600 --bind 0.0.0.0:$PORT` (уже в `Procfile`);
+- переменная `CQA_DATA_API` — ссылка GET из задания организаторов целиком;
 - переменная `ANTHROPIC_API_KEY` — ключ Claude API;
 - переменная `CQA_STORAGE_DIR` — путь к постоянному диску (например `/data`), чтобы оценки и апелляции не терялись при перезапуске;
+- переменная `CQA_TEAM_NAME` — название команды для файла результатов;
 - проверка работоспособности: `GET /healthz`.
 
 Один воркер — намеренно: очередь оценок и файловое хранилище живут в одном процессе.
