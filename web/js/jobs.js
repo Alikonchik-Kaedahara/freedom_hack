@@ -49,9 +49,12 @@ export async function startSecondOpinion(ids, engine) {
 export function confirmSecondOpinion(ids) {
   if (!ids.length) return;
   const n = ids.length;
+  // Rough pace: cloud runs 4 dialogs at a time (~20 s each), the local engine one at a time (~30 s).
+  const perDialog = state.settings?.engine === 'local' ? 30 : 5;
+  const minutes = Math.max(1, Math.round((n * perDialog) / 60));
   const m = openModal({
     title: 'Второе мнение',
-    sub: `Система ещё раз оценит ${n} ${pluralRu(n, 'диалог', 'диалога', 'диалогов')} независимо от первой оценки. Критерии, где ответы разойдутся, станут спорными.`,
+    sub: `Будет сделано ${n} ${pluralRu(n, 'повторная оценка', 'повторные оценки', 'повторных оценок')}. Это займёт около ${minutes} ${pluralRu(minutes, 'минуты', 'минут', 'минут')}. Первая оценка не меняется; критерии, где ответы разойдутся, станут спорными.`,
     footer: [
       h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'),
       h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); startSecondOpinion(ids); } }, 'Запустить'),

@@ -1094,6 +1094,12 @@ a.q-line:hover b { text-decoration: underline; }
 .op-dialogs .row-act { text-align: right; }
 .op-dialogs .chan { display: inline-flex; align-items: center; gap: 4px; color: var(--cqa-text-secondary); }
 
+/* ============ v5 · 8. Quality ============ */
+.drop-zone { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px dashed var(--cqa-border-strong); border-radius: 6px; background: var(--cqa-bg-elevated); color: var(--cqa-text-secondary); cursor: pointer; margin-top: 10px; }
+.drop-zone b { color: var(--cqa-text-primary); font-weight: 600; font-size: 13.5px; }
+.drop-zone .muted { font-size: 12.5px; }
+.drop-zone:hover, .drop-zone:focus-visible, .drop-zone.over { border-color: var(--cqa-brand-primary); background: var(--cqa-brand-soft); color: var(--cqa-brand-primary); }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
