@@ -1,5 +1,5 @@
 // Screen 3: dialog registry with one-click filters.
-import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, openModal, toast } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, openModal, toast, hashQuery, clearHashQuery } from '../ui.js';
 import { api } from '../api.js';
 import { state, subscribe, summaryFor, resultFor } from '../store.js';
 import { startEvaluation, isRunning } from '../jobs.js';
@@ -10,6 +10,13 @@ const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: fal
 const selected = new Set();
 
 export function renderDialogs(root) {
+  // Links from the Home cards open the registry already filtered: #/dialogs?f=gross | disputed | appeal
+  const preset = hashQuery().get('f');
+  if (['gross', 'disputed', 'appeal'].includes(preset)) {
+    filters.lang.clear(); filters.channel.clear(); filters.q = '';
+    filters.gross = preset === 'gross'; filters.disputed = preset === 'disputed'; filters.appeal = preset === 'appeal';
+    clearHashQuery();
+  }
   const page = h('div', { class: 'page' });
   root.append(page);
   let tbodyHost, headHost, footHost, chipsHost;

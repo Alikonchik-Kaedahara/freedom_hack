@@ -1026,6 +1026,27 @@ p { margin: 0; }
 .export-status.ok { color: var(--cqa-pass-text); }
 .export-status.warn { color: var(--cqa-warn-text); }
 
+/* ============ v5 · 3. Home ============ */
+.queue-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+.q-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+.q-card .card-title { margin: 0; }
+.q-lines { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.q-line { color: var(--cqa-text-secondary); font-size: 13.5px; text-decoration: none; }
+a.q-line:hover { color: var(--cqa-text-primary); }
+a.q-line:hover b { text-decoration: underline; }
+.q-line b { color: var(--cqa-text-primary); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 2px; }
+.q-line.plain b { font-size: inherit; font-weight: 600; }
+.q-line.zero b { color: var(--cqa-text-muted); }
+.q-foot { display: flex; align-items: center; min-height: 28px; }
+.start-card { padding: 20px; display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
+.start-card p { margin: 0; }
+.start-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.legend-inline { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+.seg-mini { gap: 14px; font-size: 12.5px; color: var(--cqa-text-secondary); }
+.seg-item { font-variant-numeric: tabular-nums; }
+.tri-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+.tri-row .why { color: var(--cqa-text-secondary); }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
@@ -1060,6 +1081,10 @@ p { margin: 0; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
   .rb-title, .bridge-badge { display: none !important; }
+  .queue-cards { grid-template-columns: 1fr; gap: 8px; }
+  .q-card { padding: 14px; gap: 8px; }
+  .q-lines { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; }
+  .q-line b { font-size: 17px; }
   .settings { grid-template-columns: 1fr; }
   .settings-tabs { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 4px; }
   .settings-tabs::-webkit-scrollbar { display: none; }

@@ -1006,6 +1006,25 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .export-status { font-weight: 600; }
 #cqa-d365-root .export-status.ok { color: var(--cqa-pass-text); }
 #cqa-d365-root .export-status.warn { color: var(--cqa-warn-text); }
+#cqa-d365-root .queue-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+#cqa-d365-root .q-card { display: flex; flex-direction: column; gap: 10px; padding: 16px; }
+#cqa-d365-root .q-card .card-title { margin: 0; }
+#cqa-d365-root .q-lines { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+#cqa-d365-root .q-line { color: var(--cqa-text-secondary); font-size: 13.5px; text-decoration: none; }
+#cqa-d365-root a.q-line:hover { color: var(--cqa-text-primary); }
+#cqa-d365-root a.q-line:hover b { text-decoration: underline; }
+#cqa-d365-root .q-line b { color: var(--cqa-text-primary); font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; margin-right: 2px; }
+#cqa-d365-root .q-line.plain b { font-size: inherit; font-weight: 600; }
+#cqa-d365-root .q-line.zero b { color: var(--cqa-text-muted); }
+#cqa-d365-root .q-foot { display: flex; align-items: center; min-height: 28px; }
+#cqa-d365-root .start-card { padding: 20px; display: flex; flex-direction: column; gap: 10px; max-width: 640px; }
+#cqa-d365-root .start-card p { margin: 0; }
+#cqa-d365-root .start-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+#cqa-d365-root .legend-inline { flex-wrap: nowrap; white-space: nowrap; overflow: hidden; }
+#cqa-d365-root .seg-mini { gap: 14px; font-size: 12.5px; color: var(--cqa-text-secondary); }
+#cqa-d365-root .seg-item { font-variant-numeric: tabular-nums; }
+#cqa-d365-root .tri-row { grid-template-columns: minmax(0, 1fr) auto auto; }
+#cqa-d365-root .tri-row .why { color: var(--cqa-text-secondary); }
 @media (max-width: 1560px) {
 #cqa-d365-root .rb-tabs a .ic { display: none; }
 #cqa-d365-root .rb-tabs a { padding: 0 9px; }
@@ -1044,6 +1063,10 @@ from { opacity: 0; transform: translateY(6px); }
 #cqa-d365-root .rb-action { display: none !important; }
 #cqa-d365-root .rb-title,
 #cqa-d365-root .bridge-badge { display: none !important; }
+#cqa-d365-root .queue-cards { grid-template-columns: 1fr; gap: 8px; }
+#cqa-d365-root .q-card { padding: 14px; gap: 8px; }
+#cqa-d365-root .q-lines { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; }
+#cqa-d365-root .q-line b { font-size: 17px; }
 #cqa-d365-root .settings { grid-template-columns: 1fr; }
 #cqa-d365-root .settings-tabs { position: static; flex-direction: row; overflow-x: auto; scrollbar-width: none; padding: 4px; }
 #cqa-d365-root .settings-tabs::-webkit-scrollbar { display: none; }

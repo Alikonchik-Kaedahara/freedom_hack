@@ -136,3 +136,15 @@ export function openModal({ title, sub, body, footer, wide = false, className = 
   root.append(overlay);
   return { close, modal };
 }
+
+/** Query part of the hash route: "#/dialogs?f=gross" → URLSearchParams {f: "gross"}. */
+export function hashQuery() {
+  const i = location.hash.indexOf('?');
+  return new URLSearchParams(i >= 0 ? location.hash.slice(i + 1) : '');
+}
+
+/** Drop the query from the address once a view has applied it, without re-routing. */
+export function clearHashQuery() {
+  const i = location.hash.indexOf('?');
+  if (i >= 0) history.replaceState(null, '', location.hash.slice(0, i));
+}
