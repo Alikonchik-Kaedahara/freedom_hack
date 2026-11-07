@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 import requests
 from flask import Flask, abort, jsonify, request, send_file, send_from_directory
 
-from cqa import replay, scoring, storage
+from cqa import export, replay, scoring, storage
 from cqa.evaluator import EvaluationError, check_engine, evaluate
 from cqa.validation import ValidationError, validate_checklist, validate_group_id, validate_records
 
@@ -211,7 +211,13 @@ def public_settings(s):
     cloud["apiKey"] = ""
     s["cloud"] = cloud
     s["dataApi"] = bool(DATA_API)
+    s["teamName"] = team_name(s)
     return s
+
+
+def team_name(settings=None):
+    settings = settings if settings is not None else storage.get_settings()
+    return (settings.get("teamName") or os.environ.get("CQA_TEAM_NAME") or "").strip() or "freedom_hack"
 
 
 @app.get("/api/settings")
@@ -364,15 +370,18 @@ def _run_one(job_id, group_id, cid, override_id):
             "createdAt": now(),
         }
         storage.put_result(_with_score(result))
+        storage.clear_failure(result["key"])
         with _jobs_lock:
             job["done"] += 1
             if meta["unresolved"]:
                 job["needsReview"] += 1
     except EvaluationError as e:
+        storage.put_failure(storage.result_key(group_id, cid), group_id, cid, str(e), now())
         with _jobs_lock:
             job["failed"] += 1
             job["errors"].append({"conversationId": cid, "message": str(e)})
     except Exception as e:  # keep the batch going
+        storage.put_failure(storage.result_key(group_id, cid), group_id, cid, f"Ошибка: {e}", now())
         with _jobs_lock:
             job["failed"] += 1
             job["errors"].append({"conversationId": cid, "message": f"Ошибка: {e}"})
@@ -432,6 +441,38 @@ def job(job_id):
 @app.get("/api/jobs")
 def jobs():
     return jsonify([j for j in JOBS.values() if j["status"] == "running"])
+
+
+# ---------- export in the organizers' format ----------
+
+@app.get("/api/export/<dataset>")
+def export_results(dataset):
+    """Write results/<dataset>/results.json for a group and return the report (dataset: dev | prod)."""
+    group_id = request.args.get("group")
+    if not group_id:
+        return bad("Укажите набор: ?group=DEV")
+    allow_replay = request.args.get("allowReplay") in ("1", "true")
+    try:
+        doc, report = export.write(group_id, dataset, team_name(), allow_replay)
+    except export.ExportError as e:
+        return bad(str(e))
+    report["problems"] = export.check(doc)
+    return jsonify(report)
+
+
+@app.get("/api/export/<dataset>/download")
+def download_results(dataset):
+    if dataset not in ("dev", "prod"):
+        abort(404)
+    path = os.path.join(export.RESULTS_DIR, dataset, "results.json")
+    if not os.path.exists(path):
+        return bad("Файл ещё не выгружен", 404)
+    return send_file(path, mimetype="application/json", as_attachment=True, download_name=f"results-{dataset}.json")
+
+
+@app.get("/api/failures")
+def failures():
+    return jsonify(storage.get_failures(request.args.get("group")))
 
 
 # ---------- audio ----------

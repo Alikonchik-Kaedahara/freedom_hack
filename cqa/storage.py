@@ -179,6 +179,32 @@ def update_result(key, fn):
         return data[key]
 
 
+# ---------- failed evaluations ----------
+# Kept separately from results so the export can report status="error" with the reason
+# (the organizers' format requires every dialog of a set, failures included).
+
+def put_failure(key, group_id, conversation_id, message, at):
+    with _lock:
+        data = _read("failures", {})
+        data[key] = {"key": key, "groupId": group_id, "conversationId": conversation_id, "error": message, "at": at}
+        _write("failures", data)
+
+
+def clear_failure(key):
+    with _lock:
+        data = _read("failures", {})
+        if key in data:
+            del data[key]
+            _write("failures", data)
+
+
+def get_failures(group_id=None):
+    data = _read("failures", {})
+    if group_id is None:
+        return data
+    return {k: v for k, v in data.items() if v.get("groupId") == group_id}
+
+
 # ---------- helpers ----------
 
 def _safe(s):

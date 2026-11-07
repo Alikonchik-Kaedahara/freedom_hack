@@ -67,9 +67,19 @@ export function renderModel(root) {
         'Критерий без сохранённого ответа не выдумывается — помечается «требует проверки».'),
       engine === 'replay' ? statusEl() : null);
 
+    // team_name for results/<dev|prod>/results.json (the organizers' submission format)
+    const teamInput = h('input', { class: 'input', value: s.teamName || '', placeholder: 'Название команды', autocomplete: 'off' });
+    const team = h('div', { class: 'card card-pad', style: { marginTop: '20px' } },
+      h('h3', { class: 'card-title' }, 'Выгрузка результатов'),
+      h('div', { class: 'desc', style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } },
+        'Название команды попадает в поле team_name файлов results/dev и results/prod (Диалоги → «Выгрузить»).'),
+      h('div', { style: { display: 'flex', gap: '10px', maxWidth: '520px' } }, teamInput,
+        h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => save({ teamName: teamInput.value.trim() }) }, 'Сохранить')));
+
     page.replaceChildren(
       h('div', { class: 'page-head' }, h('h1', null, 'Модель оценки')),
-      h('div', { class: 'engines' }, cloud, local, replay));
+      h('div', { class: 'engines' }, cloud, local, replay),
+      team);
   };
 
   const statusEl = () => {

@@ -39,6 +39,7 @@ export const api = {
   importDataset: (groupId) => req('POST', '/api/datasets/import', { groupId }),
   uploadDataset: (file, groupId) => upload('/api/datasets/upload', file, { groupId }),
   dataset: (g) => req('GET', `/api/datasets/${e(g)}`),
+  exportResults: (dataset, g) => req('GET', `/api/export/${e(dataset)}?group=${e(g)}`),
 
   checklists: () => req('GET', '/api/checklists'),
   saveChecklist: (c) => req('PUT', `/api/checklists/${e(c.id)}`, c),

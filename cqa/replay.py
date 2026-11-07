@@ -55,25 +55,31 @@ def _from_results(results, conversation_id, checklist_id):
             continue
         if (r.get("checklist") or {}).get("id") != checklist_id:
             continue
+        if (r.get("engine") or {}).get("type") == "replay":
+            continue  # never replay a replay: keep the original model as the source
         if best is None or (r.get("createdAt") or "") > (best.get("createdAt") or ""):
             best = r
-    return _to_raw(best.get("answers")) if best else None
+    if not best:
+        return None, None
+    return _to_raw(best.get("answers")), (best.get("engine") or {})
 
 
 def find_answers(conversation_id, checklist):
+    """Return (raw answers, source engine) or (None, None). Source is the engine that produced
+    the saved result ({"type": "cloud", "model": ...}); sample answers have source {"type": "sample"}."""
     checklist_id = checklist.get("id")
-    found = _from_results(storage.get_results(), conversation_id, checklist_id)
+    found, source = _from_results(storage.get_results(), conversation_id, checklist_id)
     if found is None:
-        found = _from_results(_read_json(os.path.join(SNAPSHOT_DIR, "results.json"), {}), conversation_id, checklist_id)
+        found, source = _from_results(_read_json(os.path.join(SNAPSHOT_DIR, "results.json"), {}), conversation_id, checklist_id)
     if found is None:
         sample = _read_json(os.path.join(SAMPLE_DIR, "answers.json"), {})
         by_checklist = sample.get(conversation_id) or {}
         if checklist_id in by_checklist:
-            found = dict(by_checklist[checklist_id])
+            found, source = dict(by_checklist[checklist_id]), {"type": "sample", "model": "demo/sample/answers.json"}
     if found is None:
-        return None
+        return None, None
     known = {c["id"] for c in checklist.get("criteria", [])}
-    return {k: v for k, v in found.items() if k in known}
+    return {k: v for k, v in found.items() if k in known}, source
 
 
 def count_saved():

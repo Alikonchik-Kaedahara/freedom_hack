@@ -9,6 +9,7 @@ import { startEvaluation } from '../jobs.js';
 const COLORS = ['#0E4630', '#1A9F4B', '#19798B', '#3CC36A', '#5FB3C2', '#7A6FD0', '#9BCB5A', '#E0A91B', '#C25B9B', '#2F6FDB'];
 const CHANNELS = { 'agent chat': 'Чаты', 'voice call': 'Звонки' };
 const TYPES = [['binary', 'Да / Нет'], ['scale', 'Шкала'], ['flag', 'Грубая ошибка']];
+const EXPORT_IDS = ['contact', 'discovery', 'identification', 'consultation', 'empathy', 'dialogue', 'closure', 'critical'];
 
 let draft = null;
 let dirty = false;
@@ -109,12 +110,17 @@ export function renderChecklists(root, id) {
     const body = h('div', { class: 'crow-body' },
       h('div', { class: 'field' }, h('label', null, 'Название'),
         h('input', { class: 'input', value: c.name, oninput: (e) => set('name', e.target.value), onchange: draw })),
-      h('div', { class: 'field-row', style: { gridTemplateColumns: '110px 1fr' } },
+      h('div', { class: 'field-row', style: { gridTemplateColumns: '110px 1fr 1fr' } },
         h('div', { class: 'field' }, h('label', null, 'Номер'),
           h('input', { class: 'input', value: c.code || '', oninput: (e) => set('code', e.target.value), onchange: draw })),
         h('div', { class: 'field' }, h('label', null, 'Раздел'),
           h('input', { class: 'input', value: c.section || '', list: listId, oninput: (e) => set('section', e.target.value) }),
-          h('datalist', { id: listId }, sections.map((s) => h('option', { value: s }))))),
+          h('datalist', { id: listId }, sections.map((s) => h('option', { value: s })))),
+        // Code of the organizers' results.json (eight fixed ids). A replacement criterion keeps the code
+        // of the one it replaces so the export still contains all eight.
+        h('div', { class: 'field' }, h('label', null, 'Код в выгрузке'),
+          h('select', { class: 'input', onchange: (e) => set('exportId', e.target.value) },
+            ['', ...EXPORT_IDS].map((v) => h('option', { value: v, selected: (c.exportId || '') === v }, v || '— не выгружать'))))),
       h('div', { class: 'field' }, h('label', null, 'Тип ответа'),
         h('div', { class: 'segmented' }, TYPES.map(([v, l]) =>
           h('button', { class: c.type === v ? 'on' : '', type: 'button', onclick: () => changeType(c, v, markDirty) }, l)))),

@@ -10,6 +10,8 @@ CHANNELS = ("agent chat", "voice call")
 LANGUAGES = ("RU", "KZ", "EN")
 ROLES = ("client", "operator", "bot", "system")
 WEIGHT_TOLERANCE = 0.01
+# criterion codes of the organizers' results.json (see cqa/export.py)
+EXPORT_IDS = ("contact", "discovery", "identification", "consultation", "empathy", "dialogue", "closure", "critical")
 
 
 class ValidationError(ValueError):
@@ -41,6 +43,7 @@ def validate_checklist(item):
         raise ValidationError("В чек-листе нет критериев")
 
     seen = set()
+    seen_export = set()
     weighted_sum = 0.0
     for i, c in enumerate(criteria, 1):
         if not isinstance(c, dict):
@@ -66,6 +69,14 @@ def validate_checklist(item):
             c["weight"] = 0
         else:
             weighted_sum += weight
+        export_id = str(c.get("exportId") or "").strip()
+        if export_id:
+            if export_id not in EXPORT_IDS:
+                raise ValidationError(f"Критерий {label}: код выгрузки должен быть одним из: {', '.join(EXPORT_IDS)}")
+            if export_id in seen_export:
+                raise ValidationError(f"Критерий {label}: код выгрузки «{export_id}» уже занят другим критерием")
+            seen_export.add(export_id)
+        c["exportId"] = export_id
         if ctype == "scale":
             steps = c.get("scale")
             if not isinstance(steps, list) or len(steps) < 2:

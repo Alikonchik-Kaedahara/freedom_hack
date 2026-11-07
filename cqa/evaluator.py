@@ -345,13 +345,13 @@ def _call_replay(record, checklist):
     """
     from . import replay
 
-    saved = replay.find_answers(record["conversation_id"], checklist)
+    saved, source = replay.find_answers(record["conversation_id"], checklist)
     if saved is None:
         raise EvaluationError(
             f"Для диалога {record['conversation_id']} нет сохранённого ответа (replay). "
             "Оцените его облачной или локальной моделью, затем сохраните снимок: python manage.py snapshot.")
     usage = {"inputTokens": 0, "outputTokens": 0, "costUsd": 0}
-    return json.dumps(saved, ensure_ascii=False), usage, {"type": "replay", "model": "replay"}
+    return json.dumps(saved, ensure_ascii=False), usage, {"type": "replay", "model": "replay", "source": source}
 
 
 def check_engine(settings):

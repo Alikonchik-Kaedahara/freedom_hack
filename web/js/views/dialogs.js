@@ -1,5 +1,6 @@
 // Screen 3: dialog registry with one-click filters.
-import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, openModal, toast } from '../ui.js';
+import { api } from '../api.js';
 import { state, subscribe, summaryFor } from '../store.js';
 import { startEvaluation, isRunning } from '../jobs.js';
 
@@ -34,8 +35,45 @@ export function renderDialogs(root) {
       action = h('button', { class: 'btn btn-primary btn-lg', onclick: () => startEvaluation(pending) },
         icon('sparkles', 18), `Оценить ${pending.length} ${pluralRu(pending.length, 'диалог', 'диалога', 'диалогов')}`);
     }
-    headHost.replaceChildren(h('div', { class: 'page-head' }, h('h1', null, 'Диалоги'), h('div', { class: 'head-actions' }, action)));
+    const evaluated = state.records.filter((r) => summaryFor(r.conversation_id)).length;
+    const exportBtn = evaluated && !running
+      ? h('button', { class: 'btn btn-secondary btn-lg', title: 'results.json в формате организаторов', onclick: openExportModal }, icon('download', 18), 'Выгрузить')
+      : null;
+    headHost.replaceChildren(h('div', { class: 'page-head' }, h('h1', null, 'Диалоги'), h('div', { class: 'head-actions' }, exportBtn, action)));
   };
+
+  // results/<dev|prod>/results.json in the organizers' JSON 1.0 format (see cqa/export.py)
+  function openExportModal() {
+    let modal;
+    const report = h('div');
+    const run = async (dataset) => {
+      report.replaceChildren(h('div', { class: 'muted' }, 'Формируем файл…'));
+      try {
+        const r = await api.exportResults(dataset, state.group);
+        const lines = [
+          h('div', null, h('b', null, r.path), ` — записей ${r.total}: ok ${r.ok}, error ${r.error} · model.mode ${r.mode} (${r.modelName})`),
+          r.replay?.length ? h('div', { class: 'import-error' }, `${r.replay.length} ${pluralRu(r.replay.length, 'результат получен', 'результата получены', 'результатов получены')} движком replay и выгружены как error — для сдачи оцените их реальной моделью`) : null,
+          ...Object.entries(r.errors || {}).slice(0, 8).map(([cid, why]) => h('div', { class: 'muted' }, `error ${cid}: ${why}`)),
+          r.problems?.length ? h('div', { class: 'import-error' }, 'Проблемы формата: ' + r.problems.slice(0, 5).join('; ')) : h('div', { style: { color: 'var(--green)' } }, 'Формат проверен: проблем нет'),
+          h('a', { class: 'btn btn-secondary', href: `${window.CQA_API_BASE || ''}/api/export/${dataset}/download`, download: `results-${dataset}.json` }, icon('download', 16), 'Скачать файл'),
+          h('div', { class: 'muted', style: { fontSize: '13px' } }, 'Файл уже записан в папку results/ репозитория — осталось git add, commit и push.'),
+        ];
+        report.replaceChildren(h('div', { style: { display: 'flex', flexDirection: 'column', gap: '10px' } }, lines));
+      } catch (err) {
+        report.replaceChildren(h('div', { class: 'import-error' }, err.message));
+      }
+    };
+    modal = openModal({
+      title: `Выгрузка results.json — набор ${state.group}`,
+      body: [
+        h('div', { class: 'muted', style: { marginBottom: '12px' } }, 'Один объект на диалог, восемь критериев формата организаторов, нумерация реплик с 1, итог с перераспределением N/A. Неоценённые диалоги попадают в файл со status = error.'),
+        h('div', { style: { display: 'flex', gap: '10px', marginBottom: '14px' } },
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: () => run('dev') }, 'results/dev'),
+          h('button', { class: 'btn btn-primary', type: 'button', onclick: () => run('prod') }, 'results/prod')),
+        report,
+      ],
+    });
+  }
 
   const chip = (label, on, toggle, opts = {}) =>
     h('button', { class: `chip ${on ? 'on' : ''} ${opts.danger ? 'danger' : ''}`, type: 'button', onclick: () => { toggle(); drawAll(); } },
