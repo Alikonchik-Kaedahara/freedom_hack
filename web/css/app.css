@@ -375,7 +375,7 @@
 to { transform: rotate(360deg); }
 }
 #cqa-d365-root .mx { display: inline-flex; align-items: center; gap: 3px; }
-#cqa-d365-root .mx i { width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-style: normal; font-family: var(--cqa-font-mono); font-size: 9px; font-weight: 700; color: #fff; background: var(--cqa-bg-sunken); }
+#cqa-d365-root .mx i { width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-style: normal; font-family: var(--cqa-font-sans); font-size: 11px; line-height: 1; font-weight: 700; color: #fff; background: var(--cqa-bg-sunken); }
 #cqa-d365-root .mx i.ok { background: var(--cqa-pass-solid); }
 #cqa-d365-root .mx i.part { background: var(--cqa-warn-solid); }
 #cqa-d365-root .mx i.fail { background: var(--cqa-fail-solid); }

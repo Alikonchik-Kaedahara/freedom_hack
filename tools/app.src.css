@@ -409,7 +409,7 @@ p { margin: 0; }
 
 /* criteria matrix */
 .mx { display: inline-flex; align-items: center; gap: 3px; }
-.mx i { width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-style: normal; font-family: var(--cqa-font-mono); font-size: 9px; font-weight: 700; color: #fff; background: var(--cqa-bg-sunken); }
+.mx i { width: 18px; height: 18px; border-radius: 3px; display: grid; place-items: center; font-style: normal; font-family: var(--cqa-font-sans); font-size: 11px; line-height: 1; font-weight: 700; color: #fff; background: var(--cqa-bg-sunken); }
 .mx i.ok { background: var(--cqa-pass-solid); }
 .mx i.part { background: var(--cqa-warn-solid); }
 .mx i.fail { background: var(--cqa-fail-solid); }

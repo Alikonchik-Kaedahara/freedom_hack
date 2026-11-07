@@ -180,7 +180,7 @@ export function renderDialogs(root) {
       h('span', null, rows.length === state.records.length ? `${rows.length} ${pluralRu(rows.length, 'диалог', 'диалога', 'диалогов')}` : `Показано ${rows.length} из ${state.records.length}`),
       h('span', { class: 'mx-legend' },
         h('span', null, h('i', { class: 'ok', 'aria-hidden': 'true' }, '✓'), 'выполнен'),
-        h('span', null, h('i', { class: 'part', 'aria-hidden': 'true' }, '◐'), 'частично'),
+        h('span', null, h('i', { class: 'part', 'aria-hidden': 'true' }, '½'), 'частично'),
         h('span', null, h('i', { class: 'fail', 'aria-hidden': 'true' }, '×'), 'не выполнен'),
         h('span', null, h('i', { class: 'na', 'aria-hidden': 'true' }, '–'), 'не применим'))));
   };
@@ -254,7 +254,7 @@ const operatorOf = (cid) => {
 };
 
 // Eight squares, one per checklist criterion; the last one is the gross-error check.
-const MX_SYMBOL = { ok: '✓', clean: '✓', part: '◐', fail: '×', flag: '!', na: '–' };
+const MX_SYMBOL = { ok: '✓', clean: '✓', part: '½', fail: '×', flag: '!', na: '–' };
 const MX_TITLE = { ok: 'выполнен', part: 'частично', fail: 'не выполнен', na: 'не применим', flag: 'грубая ошибка', clean: 'грубых ошибок нет' };
 function matrix(cid) {
   const res = resultFor(cid);

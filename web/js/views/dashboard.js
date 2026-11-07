@@ -85,8 +85,8 @@ function queueCards(evaluated) {
       line(decidedToday, `${pluralRu(decidedToday, 'решена', 'решены', 'решено')} сегодня`, '#/appeals'),
     ], h('a', { class: 'btn btn-secondary btn-sm', href: '#/appeals' }, waiting ? 'Рассмотреть' : decidedToday ? 'Открыть апелляции' : 'Нет открытых'), waiting || decidedToday ? 'appeals-card' : 'appeals-card quiet'),
     card('Операторы', ops.total ? [
-      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ' с двумя и более оценками ниже 65'),
-      h('div', { class: 'q-line plain' }, `Один низкий результат: ${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')}`),
+      h('div', { class: 'q-line' }, h('b', null, ops.repeat), ` ${pluralRu(ops.repeat, 'оператор повторяет', 'оператора повторяют', 'операторов повторяют')} низкие оценки (2+ диалога ниже 65)`),
+      h('div', { class: 'q-line plain' }, `Один низкий диалог: ${ops.single} ${pluralRu(ops.single, 'оператор', 'оператора', 'операторов')} — пока не вывод`),
       ops.weakest ? h('a', { class: 'q-line plain', href: `#/operators/${encodeURIComponent(ops.weakest.name)}` },
         `Минимум: ${ops.weakest.name} · ${fmtScore(ops.weakest.avg)} · ${ops.weakest.n} ${pluralRu(ops.weakest.n, 'диалог', 'диалога', 'диалогов')}`) : null,
     ] : [h('div', { class: 'q-line plain' }, 'Имена операторов появятся после оценки')],
