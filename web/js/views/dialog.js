@@ -6,6 +6,8 @@ import { state, subscribe, resultFor, summaryFor, putResult } from '../store.js'
 import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
+import { openReview } from './appeals.js';
+import { setRibbonAction } from '../app.js';
 
 const SPEAKER = { client: 'Клиент', operator: 'Оператор', bot: 'Бот', system: 'Система' };
 const openSets = new Map(); // conversation id -> Set of open criterion ids
@@ -120,16 +122,18 @@ export function renderDialog(root, cid) {
   function drawHead() {
     const res = resultFor(cid);
     const running = isRunning(cid) || (state.job?.status === 'running');
+    const mkEval = () => (res ? null : h('button', { class: 'btn btn-primary btn-lg eval-main', disabled: running, onclick: () => startEvaluation([cid]) }, icon('sparkles', 15), 'Оценить диалог'));
+    setRibbonAction(mkEval());
     headHost.replaceChildren(h('div', { class: 'page-head' },
       h('div', { class: 'head-left' },
-        h('button', { class: 'back-btn', onclick: () => history.length > 1 ? history.back() : (location.hash = '#/dialogs'), 'aria-label': 'Назад' }, icon('back', 20)),
+        h('button', { class: 'back-btn', onclick: () => history.length > 1 ? history.back() : (location.hash = '#/dialogs'), 'aria-label': 'Назад' }, icon('back', 17)),
         h('div', null,
-          h('h1', null, `Диалог ${cid}`),
+          h('h1', null, 'Диалог ', h('span', { class: 'mono' }, cid)),
           h('div', { class: 'sub' }, `${channelLabel(rec.channel)} · ${rec.language}`))),
       h('div', { class: 'head-actions' },
         res
-          ? h('button', { class: 'btn btn-glass', disabled: running, onclick: () => startEvaluation([cid]), 'aria-label': 'Переоценить' }, icon('refresh', 16), h('span', { class: 'btn-label' }, 'Переоценить'))
-          : h('button', { class: 'btn btn-primary btn-lg', disabled: running, onclick: () => startEvaluation([cid]) }, icon('sparkles', 18), 'Оценить'))));
+          ? h('button', { class: 'btn btn-glass', disabled: running, onclick: () => startEvaluation([cid]), 'aria-label': 'Переоценить' }, icon('refresh', 15), h('span', { class: 'btn-label' }, 'Переоценить'))
+          : mkEval())));
   }
 
   function drawBanner() {
@@ -221,11 +225,11 @@ export function renderDialog(root, cid) {
         icon('alert', 15), h('div', null, h('b', null, dispute.text), ' — ', dispute.why || '')) : null,
       ans?.confidence ? h('div', { class: 'conf-line' }, `Уверенность модели: ${CONFIDENCE_LABEL[ans.confidence] || ans.confidence}`) : null,
       ev.length ? h('div', null,
-        h('div', { style: { fontSize: '12px', color: 'var(--muted)', fontWeight: 600, marginBottom: '6px' } }, evLabel),
+        h('div', { class: 'ev-label' }, evLabel),
         h('div', { class: 'ev-list' }, ev.map((i) =>
           h('button', { class: `ev ${EV_CLASS[status] || ''}`, type: 'button', onclick: (e) => { e.stopPropagation(); jump(ev, status, i, true); } },
             icon('clock', 14), times[i] || `#${i}`)))) : null,
-      appeals.map((a) => appealBox(c, a, origAns)),
+      appeals.map((a) => appealBox(res, c, a, origAns)),
       h('div', { class: 'crit-foot' },
         h('span', null, pointsText(c, p, sc)),
         !pending ? h('button', { class: 'link-btn', type: 'button', onclick: (e) => { e.stopPropagation(); openAppeal(res, c); } }, icon('scale', 15), 'Оспорить') : null)) : null;
@@ -250,15 +254,18 @@ export function renderDialog(root, cid) {
     return parts.length ? h('div', { class: 'total-meta' }, parts.join(' · ')) : null;
   }
 
+  // Base weight from the checklist, the weight after N/A redistribution, and the points earned.
   function pointsText(c, p, sc) {
-    if (c.type === 'flag') return 'Без баллов';
-    if (p.points == null) return `Вес ${c.weight} перераспределён`;
-    const pts = round2(p.points);
+    if (c.type === 'flag') return h('span', { class: 'weights' }, h('span', null, 'Без баллов · отмечается отдельно'));
+    if (p.points == null) return h('span', { class: 'weights' }, h('span', null, 'Базовый вес ', h('b', null, c.weight)), h('span', { class: 'shift' }, 'N/A → вес перераспределён'));
     const redistributed = sc.possible > 0 && Math.abs(sc.possible - 100) > 0.001;
-    return `${pts} из ${c.weight} баллов${redistributed ? ` · вес после N/A ${p.effWeight}` : ''}`;
+    return h('span', { class: 'weights' },
+      h('span', null, 'Базовый вес ', h('b', null, c.weight)),
+      redistributed ? h('span', { class: 'shift' }, 'После N/A ', h('b', null, p.effWeight)) : h('span', null, 'Перераспределения нет'),
+      h('span', null, 'Баллы ', h('b', null, redistributed ? `${p.effPoints} / ${p.effWeight}` : `${round2(p.points)} / ${c.weight}`)));
   }
 
-  function appealBox(c, a, origAns) {
+  function appealBox(res, c, a, origAns) {
     const st = { pending: ['amber', 'На рассмотрении'], accepted: ['green', 'Принята'], rejected: ['', 'Отклонена'] }[a.status];
     const from = verdictOf(c, origAns?.answer).text;
     const to = a.decision?.answer != null ? verdictOf(c, a.decision.answer).text : null;
@@ -267,7 +274,10 @@ export function renderDialog(root, cid) {
       h('q', null, a.comment),
       a.decision ? h('div', null,
         to ? h('div', { class: 'change' }, `Исходно: ${from} → Решение: ${to}`) : h('div', { class: 'change' }, `Оценка ${from} оставлена`),
-        h('div', { style: { color: 'var(--muted)' } }, a.decision.reason)) : null);
+        h('div', { class: 'muted' }, a.decision.reason)) : null,
+      a.status === 'pending' ? h('div', { class: 'actions' },
+        h('button', { class: 'btn btn-secondary btn-xs', onclick: (e) => { e.stopPropagation(); openReview(res, a, { preset: 'keep' }); } }, 'Подтвердить оценку'),
+        h('button', { class: 'btn btn-primary btn-xs', onclick: (e) => { e.stopPropagation(); openReview(res, a); } }, 'Изменить оценку')) : null);
   }
 
   function openAppeal(res, c) {

@@ -1,8 +1,10 @@
 // Screen 3: dialog registry with one-click filters.
 import { h, icon, fmtScore, scoreClass, channelIcon, channelLabel, pluralRu, openModal, toast } from '../ui.js';
 import { api } from '../api.js';
-import { state, subscribe, summaryFor } from '../store.js';
+import { state, subscribe, summaryFor, resultFor } from '../store.js';
 import { startEvaluation, isRunning } from '../jobs.js';
+import { finalAnswers, score } from '../scoring.js';
+import { setRibbonAction } from '../app.js';
 
 const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, q: '' };
 const selected = new Set();
@@ -19,27 +21,49 @@ export function renderDialogs(root) {
     if (filters.gross && !s?.gross) return false;
     if (filters.appeal && !s?.pending) return false;
     if (filters.disputed && !s?.disputed?.length) return false;
-    if (filters.q && !r.conversation_id.toLowerCase().includes(filters.q.toLowerCase())) return false;
+    if (filters.q && !matchOf(r)) return false;
     return true;
   });
+
+  // Search matches the conversation id or any message text; the matched snippet is shown under the id.
+  const matchOf = (r) => {
+    const q = filters.q.trim().toLowerCase();
+    if (!q) return null;
+    if (r.conversation_id.toLowerCase().includes(q)) return { id: true };
+    for (const m of r.transcript) {
+      const t = m.text || '';
+      const i = t.toLowerCase().indexOf(q);
+      if (i >= 0) return { text: t, i, len: q.length };
+    }
+    return null;
+  };
 
   const drawHead = () => {
     const running = state.job?.status === 'running';
     const sel = [...selected].filter((id) => state.byId[id]);
     const pending = state.records.filter((r) => !summaryFor(r.conversation_id)).map((r) => r.conversation_id);
-    let action = null;
-    if (!running && sel.length) {
-      action = h('button', { class: 'btn btn-primary btn-lg', onclick: () => { startEvaluation(sel); selected.clear(); drawAll(); } },
-        icon('sparkles', 18), `Оценить выбранные · ${sel.length}`);
-    } else if (!running && pending.length) {
-      action = h('button', { class: 'btn btn-primary btn-lg', onclick: () => startEvaluation(pending) },
-        icon('sparkles', 18), `Оценить ${pending.length} ${pluralRu(pending.length, 'диалог', 'диалога', 'диалогов')}`);
-    }
+    // Checked rows win over "evaluate everything", so a click never runs all 65 by accident.
+    const mkAction = () => {
+      if (running) return null;
+      if (sel.length) {
+        return h('button', { class: 'btn btn-primary btn-lg eval-main', onclick: () => { startEvaluation(sel); selected.clear(); drawAll(); } },
+          icon('sparkles', 15), `Оценить выбранные (${sel.length})`);
+      }
+      if (pending.length) {
+        return h('button', { class: 'btn btn-primary btn-lg eval-main', onclick: () => startEvaluation(pending) },
+          icon('sparkles', 15), `Оценить диалоги (${pending.length})`);
+      }
+      return null;
+    };
+    const action = mkAction();
+    setRibbonAction(mkAction());
     const evaluated = state.records.filter((r) => summaryFor(r.conversation_id)).length;
     const exportBtn = evaluated && !running
-      ? h('button', { class: 'btn btn-secondary btn-lg', title: 'results.json в формате организаторов', onclick: openExportModal }, icon('download', 18), 'Выгрузить')
+      ? h('button', { class: 'btn btn-secondary btn-lg', title: 'results.json в формате организаторов', onclick: openExportModal }, icon('download', 15), 'Выгрузить')
       : null;
-    headHost.replaceChildren(h('div', { class: 'page-head' }, h('h1', null, 'Диалоги'), h('div', { class: 'head-actions' }, exportBtn, action)));
+    headHost.replaceChildren(h('div', { class: 'page-head' },
+      h('div', null, h('h1', null, 'Реестр диалогов'), h('div', { class: 'sub' }, `${evaluated} из ${state.records.length} оценено · отметьте строки галочками, чтобы оценить выборочно`)),
+      h('div', { class: 'head-actions' }, exportBtn, action)));
   };
 
   // results/<dev|prod>/results.json in the organizers' JSON 1.0 format (see cqa/export.py)
@@ -54,7 +78,7 @@ export function renderDialogs(root) {
           h('div', null, h('b', null, r.path), ` — записей ${r.total}: ok ${r.ok}, error ${r.error} · model.mode ${r.mode} (${r.modelName})`),
           r.replay?.length ? h('div', { class: 'import-error' }, `${r.replay.length} ${pluralRu(r.replay.length, 'результат получен', 'результата получены', 'результатов получены')} движком replay и выгружены как error — для сдачи оцените их реальной моделью`) : null,
           ...Object.entries(r.errors || {}).slice(0, 8).map(([cid, why]) => h('div', { class: 'muted' }, `error ${cid}: ${why}`)),
-          r.problems?.length ? h('div', { class: 'import-error' }, 'Проблемы формата: ' + r.problems.slice(0, 5).join('; ')) : h('div', { style: { color: 'var(--green)' } }, 'Формат проверен: проблем нет'),
+          r.problems?.length ? h('div', { class: 'import-error' }, 'Проблемы формата: ' + r.problems.slice(0, 5).join('; ')) : h('div', { style: { color: 'var(--cqa-emerald)' } }, 'Формат проверен: проблем нет'),
           h('a', { class: 'btn btn-secondary', href: `${window.CQA_API_BASE || ''}/api/export/${dataset}/download`, download: `results-${dataset}.json` }, icon('download', 16), 'Скачать файл'),
           h('div', { class: 'muted', style: { fontSize: '13px' } }, 'Файл уже записан в папку results/ репозитория — осталось git add, commit и push.'),
         ];
@@ -82,7 +106,7 @@ export function renderDialogs(root) {
 
   const drawChips = () => {
     const search = h('input', {
-      class: 'input', placeholder: 'Поиск по ID', value: filters.q,
+      class: 'input', placeholder: 'Поиск по ID или тексту реплик', value: filters.q,
       oninput: (e) => { filters.q = e.target.value; drawRows(); },
     });
     chipsHost.replaceChildren(h('div', { class: 'toolbar' },
@@ -109,10 +133,16 @@ export function renderDialogs(root) {
       h('thead', null, h('tr', null,
         h('th', { style: { width: '44px' } }, headCb),
         h('th', null, 'ID'), h('th', null, 'Канал'), h('th', null, 'Язык'),
-        h('th', { class: 'right' }, 'Балл'), h('th', null, 'Статус'))),
+        h('th', null, 'Матрица 01–08'),
+        h('th', { class: 'right' }, 'Балл'), h('th', null, 'Статус'), h('th', null, ''))),
       h('tbody', null, rows.map(row))));
     footHost.replaceChildren(h('div', { class: 'table-foot' },
-      rows.length === state.records.length ? `${rows.length} ${pluralRu(rows.length, 'диалог', 'диалога', 'диалогов')}` : `Показано ${rows.length} из ${state.records.length}`));
+      h('span', null, rows.length === state.records.length ? `${rows.length} ${pluralRu(rows.length, 'диалог', 'диалога', 'диалогов')}` : `Показано ${rows.length} из ${state.records.length}`),
+      h('span', { class: 'mx-legend' },
+        h('span', null, h('i', { style: { background: 'var(--cqa-emerald-bright)' } }), 'Да / максимум'),
+        h('span', null, h('i', { style: { background: 'var(--cqa-amber-fill)' } }), 'Частично'),
+        h('span', null, h('i', { style: { background: 'var(--cqa-red)' } }), 'Нет / 0'),
+        h('span', null, h('i', { style: { background: 'var(--cqa-surface-3)' } }), 'N/A'))));
   };
 
   const row = (r) => {
@@ -121,8 +151,8 @@ export function renderDialogs(root) {
     const running = isRunning(cid);
     const tags = [];
     if (running) tags.push(h('span', { class: 'tag' }, h('span', { class: 'spinner' }), 'Оценивается'));
-    else if (!s) tags.push(h('span', { class: 'tag outline' }, 'Не оценён'));
-    if (s?.gross) tags.push(h('span', { class: 'tag red' }, icon('flag', 14), 'Критично'));
+    else if (!s) tags.push(h('span', { class: 'tag' }, 'Не оценён'));
+    if (s?.gross) tags.push(h('span', { class: 'tag red' }, icon('shield', 12), 'Критично'));
     if (s?.pending) tags.push(h('span', { class: 'tag amber' }, icon('scale', 14), 'Апелляция'));
     else if (s?.changed) tags.push(h('span', { class: 'tag green' }, 'Пересмотрен'));
     if (s?.disputed?.length) tags.push(h('span', { class: 'tag amber', title: 'Критерии с низкой уверенностью или непройденной проверкой' }, icon('alert', 14), `Спорно · ${s.disputed.length}`));
@@ -130,13 +160,25 @@ export function renderDialogs(root) {
       type: 'checkbox', class: 'cb', checked: selected.has(cid), 'aria-label': `Выбрать ${cid}`,
       onclick: (e) => { e.stopPropagation(); e.target.checked ? selected.add(cid) : selected.delete(cid); drawHead(); },
     });
-    return h('tr', { class: s?.gross ? 'critical' : '', onclick: () => (location.hash = `#/dialog/${encodeURIComponent(cid)}`) },
+    const open = () => (location.hash = `#/dialog/${encodeURIComponent(cid)}`);
+    const m = matchOf(r);
+    const act = s
+      ? h('button', { class: 'btn btn-secondary btn-xs', onclick: (e) => { e.stopPropagation(); open(); } }, 'Открыть →')
+      : h('button', { class: 'btn btn-secondary btn-xs', disabled: running || state.job?.status === 'running', onclick: (e) => { e.stopPropagation(); startEvaluation([cid]); } }, 'Оценить');
+    return h('tr', { class: `${s?.gross ? 'critical' : ''} ${selected.has(cid) ? 'selected' : ''}`, onclick: open },
       h('td', null, cb),
-      h('td', null, h('span', { class: 'id' }, cid)),
-      h('td', null, h('span', { class: 'chan' }, icon(channelIcon(r.channel), 16), channelLabel(r.channel))),
+      h('td', null, h('span', { class: 'id' }, cid), m?.text ? h('div', { class: 'match-hint' }, snippet(m)) : null),
+      h('td', null, h('span', { class: 'chan' }, icon(channelIcon(r.channel), 14), channelLabel(r.channel))),
       h('td', null, h('span', { class: 'tag outline' }, r.language)),
+      h('td', null, matrix(cid)),
       h('td', { class: 'right' }, h('span', { class: `score ${scoreClass(s?.total)}` }, fmtScore(s?.total))),
-      h('td', null, h('div', { class: 'tags' }, tags)));
+      h('td', null, h('div', { class: 'tags' }, tags)),
+      h('td', { class: 'row-act' }, act));
+  };
+
+  const snippet = (m) => {
+    const from = Math.max(0, m.i - 24);
+    return [from ? '…' : '', m.text.slice(from, m.i), h('mark', null, m.text.slice(m.i, m.i + m.len)), m.text.slice(m.i + m.len, m.i + m.len + 40), '…'];
   };
 
   const drawAll = () => { drawHead(); drawChips(); drawRows(); };
@@ -148,4 +190,18 @@ export function renderDialogs(root) {
   return subscribe((w) => {
     if (w === 'results' || w === 'job') { drawHead(); drawRows(); }
   });
+}
+
+// Eight 18×18 squares, one per checklist criterion, plus a red shield for a gross error (criterion 08).
+const MX_TITLE = { ok: 'Да / максимум', part: 'Частично', fail: 'Нет / 0', na: 'N/A', flag: 'Грубая ошибка', clean: 'Нет грубых ошибок' };
+function matrix(cid) {
+  const res = resultFor(cid);
+  if (!res) return h('span', { class: 'mx' }, Array.from({ length: 8 }, () => h('i', { class: 'empty' })));
+  const sc = score(res.checklist, finalAnswers(res));
+  const cells = res.checklist.criteria.map((c) => {
+    const st = sc.per[c.id]?.status || 'na';
+    const cls = st === 'flag' ? 'fail' : st === 'clean' ? 'ok' : st;
+    return h('i', { class: cls, title: `${c.code} ${c.name}: ${MX_TITLE[st] || st}` }, st === 'na' ? '–' : '');
+  });
+  return h('span', { class: 'mx' }, cells, sc.gross ? h('span', { class: 'shield', title: 'Грубая ошибка (08)' }, icon('shield', 15)) : null);
 }

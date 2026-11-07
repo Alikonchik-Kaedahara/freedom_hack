@@ -31,23 +31,27 @@ export function renderModel(root) {
 
     const cloud = h('div', { class: `card engine ${engine === 'cloud' ? 'on' : ''}`, onclick: () => engine !== 'cloud' && save({ engine: 'cloud' }) },
       h('div', { class: 'engine-top' },
-        h('div', { class: 'engine-icon' }, icon('cloud', 26)),
-        h('div', null, h('h3', null, 'Облачная модель'), h('div', { class: 'desc' }, 'Claude API')),
-        h('span', { class: 'radio' }, engine === 'cloud' ? icon('check', 15, 3) : null)),
+        h('div', { class: 'engine-icon' }, icon('cloud', 20)),
+        h('div', null, h('h3', null, 'Облачная модель'), h('div', { class: 'desc' }, `Anthropic Claude API · ${model.label}`),
+          engine === 'cloud' ? h('span', { class: 'active-badge' }, 'Активна') : null),
+        h('span', { class: 'radio', role: 'radio', 'aria-checked': String(engine === 'cloud') })),
       h('div', { class: 'price' }, h('b', null, `$${cost.value.toFixed(3)}`), h('span', null, cost.actual ? 'за диалог, по факту' : 'за диалог, оценка')),
       h('div', { class: 'field', onclick: (e) => e.stopPropagation() }, h('label', null, 'Модель'),
         h('select', { class: 'select', onchange: (e) => save({ cloud: { model: e.target.value } }) },
-          MODELS.map((m) => h('option', { value: m.id, selected: m.id === model.id ? 'selected' : null }, m.label)))),
-      h('div', { class: 'field', onclick: (e) => e.stopPropagation() }, h('label', null, 'Ключ API'), keyInput),
-      engine === 'cloud' ? statusEl() : null);
+          MODELS.map((m) => h('option', { value: m.id, selected: m.id === model.id ? 'selected' : null }, `${m.label} (${m.id})`)))),
+      s.cloud.hasKey
+        ? h('span', { class: 'status ok' }, h('i'), '✓ Ключ API подключён на сервере')
+        : h('div', { class: 'field', onclick: (e) => e.stopPropagation() }, h('label', null, 'Ключ API'), keyInput),
+      engine === 'cloud' && !s.cloud.hasKey ? statusEl() : null);
 
     const urlInput = h('input', { class: 'input', value: s.local.url, onchange: (e) => save({ local: { url: e.target.value.trim() } }) });
     const modelInput = h('input', { class: 'input', value: s.local.model, list: 'ollama-models', onchange: (e) => save({ local: { model: e.target.value.trim() } }) });
     const local = h('div', { class: `card engine ${engine === 'local' ? 'on' : ''}`, onclick: () => engine !== 'local' && save({ engine: 'local' }) },
       h('div', { class: 'engine-top' },
-        h('div', { class: 'engine-icon' }, icon('server', 26)),
-        h('div', null, h('h3', null, 'Локальная модель'), h('div', { class: 'desc' }, 'Ollama / vLLM на своём сервере')),
-        h('span', { class: 'radio' }, engine === 'local' ? icon('check', 15, 3) : null)),
+        h('div', { class: 'engine-icon' }, icon('server', 20)),
+        h('div', null, h('h3', null, 'Локальная модель'), h('div', { class: 'desc' }, 'Ollama / vLLM на своём сервере'),
+          engine === 'local' ? h('span', { class: 'active-badge' }, 'Активна') : null),
+        h('span', { class: 'radio', role: 'radio', 'aria-checked': String(engine === 'local') })),
       h('div', { class: 'price' }, h('b', null, '$0'), h('span', null, 'данные не покидают контур')),
       h('div', { class: 'field', onclick: (e) => e.stopPropagation() }, h('label', null, 'Адрес сервера'), urlInput),
       h('div', { class: 'field', onclick: (e) => e.stopPropagation() }, h('label', null, 'Модель'), modelInput,
@@ -58,26 +62,27 @@ export function renderModel(root) {
     // never waits for an API and never spends money. Unknown criteria are marked "требует проверки".
     const replay = h('div', { class: `card engine ${engine === 'replay' ? 'on' : ''}`, onclick: () => engine !== 'replay' && save({ engine: 'replay' }) },
       h('div', { class: 'engine-top' },
-        h('div', { class: 'engine-icon' }, icon('refresh', 26)),
-        h('div', null, h('h3', null, 'Replay'), h('div', { class: 'desc' }, 'Сохранённые ответы, без вызова модели')),
-        h('span', { class: 'radio' }, engine === 'replay' ? icon('check', 15, 3) : null)),
+        h('div', { class: 'engine-icon' }, icon('refresh', 20)),
+        h('div', null, h('h3', null, 'Replay'), h('div', { class: 'desc' }, 'Сохранённые ответы, без вызова модели'),
+          engine === 'replay' ? h('span', { class: 'active-badge' }, 'Активна') : null),
+        h('span', { class: 'radio', role: 'radio', 'aria-checked': String(engine === 'replay') })),
       h('div', { class: 'price' }, h('b', null, '$0'), h('span', null, 'демо и тесты без ключа')),
-      h('div', { class: 'desc', style: { fontSize: '13px', color: 'var(--muted)', lineHeight: 1.5 } },
+      h('div', { class: 'desc', style: { fontSize: '12.5px', lineHeight: 1.5 } },
         'Берёт ответ из прошлых оценок, снимка demo/snapshot или примеров demo/sample. ',
         'Критерий без сохранённого ответа не выдумывается — помечается «требует проверки».'),
       engine === 'replay' ? statusEl() : null);
 
     // team_name for results/<dev|prod>/results.json (the organizers' submission format)
     const teamInput = h('input', { class: 'input', value: s.teamName || '', placeholder: 'Название команды', autocomplete: 'off' });
-    const team = h('div', { class: 'card card-pad', style: { marginTop: '20px' } },
+    const team = h('div', { class: 'card card-pad', style: { marginTop: '12px' } },
       h('h3', { class: 'card-title' }, 'Выгрузка результатов'),
-      h('div', { class: 'desc', style: { fontSize: '13px', color: 'var(--muted)', marginBottom: '10px' } },
+      h('div', { class: 'muted', style: { marginBottom: '10px' } },
         'Название команды попадает в поле team_name файлов results/dev и results/prod (Диалоги → «Выгрузить»).'),
       h('div', { style: { display: 'flex', gap: '10px', maxWidth: '520px' } }, teamInput,
         h('button', { class: 'btn btn-secondary', type: 'button', onclick: () => save({ teamName: teamInput.value.trim() }) }, 'Сохранить')));
 
     page.replaceChildren(
-      h('div', { class: 'page-head' }, h('h1', null, 'Модель оценки')),
+      h('div', { class: 'page-head' }, h('div', null, h('h1', null, 'AI-модель оценки'), h('div', { class: 'sub' }, 'Какой движок выставляет оценки. Баллы и пересчёт N/A считаются в коде, а не моделью.'))),
       h('div', { class: 'engines' }, cloud, local, replay),
       team);
   };
