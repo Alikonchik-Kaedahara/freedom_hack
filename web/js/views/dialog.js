@@ -6,7 +6,8 @@ import { state, subscribe, resultFor, summaryFor, putResult } from '../store.js'
 import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
 import { startEvaluation, startSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
-import { openReview } from './appeals.js';
+import { openReview, byLine } from './appeals.js';
+import { requireUser } from '../user.js';
 import { setRibbonAction } from '../app.js';
 
 const SPEAKER = { client: 'Клиент', operator: 'Оператор', bot: 'Бот', system: 'Система' };
@@ -292,7 +293,7 @@ export function renderDialog(root, cid) {
       appeals.map((a) => appealBox(res, c, a, origAns)),
       h('div', { class: 'crit-foot' },
         h('span', null, pointsText(c, p, sc)),
-        !pending ? h('button', { class: 'link-btn', type: 'button', onclick: (e) => { e.stopPropagation(); openAppeal(res, c); } }, icon('scale', 15), 'Оспорить') : null)) : null;
+        !pending ? h('button', { class: 'link-btn', type: 'button', onclick: (e) => { e.stopPropagation(); openAppeal(res, c); } }, 'Подать апелляцию') : null)) : null;
 
     return h('div', { class: `crit ${isOpen ? 'open' : ''} ${status === 'flag' ? 'is-flag' : ''}` },
       h('div', { class: 'crit-head', onclick: toggle },
@@ -330,25 +331,28 @@ export function renderDialog(root, cid) {
     const from = verdictOf(c, origAns?.answer).text;
     const to = a.decision?.answer != null ? verdictOf(c, a.decision.answer).text : null;
     return h('div', { class: 'appeal-box' },
-      h('div', { class: 'row' }, h('span', { class: `tag ${st[0]}` }, icon('scale', 13), `Апелляция · ${st[1]}`)),
+      h('div', { class: 'row' }, h('span', { class: `tag ${st[0]}` }, `Апелляция · ${st[1]}`)),
       h('q', null, a.comment),
+      h('div', { class: 'who-line' }, `Подал: ${byLine(a.author, a.createdAt) || '—'}`),
       a.decision ? h('div', null,
-        to ? h('div', { class: 'change' }, `Исходно: ${from} → Решение: ${to}`) : h('div', { class: 'change' }, `Оценка ${from} оставлена`),
-        h('div', { class: 'muted' }, a.decision.reason)) : null,
+        to ? h('div', { class: 'change' }, `Было: ${from} → стало: ${to}`) : h('div', { class: 'change' }, `Оценка «${from}» оставлена`),
+        h('div', { class: 'muted' }, a.decision.reason),
+        h('div', { class: 'who-line' }, `Решил: ${byLine(a.decision.by, a.decision.decidedAt) || '—'}`)) : null,
       a.status === 'pending' ? h('div', { class: 'actions' },
-        h('button', { class: 'btn btn-secondary btn-xs', onclick: (e) => { e.stopPropagation(); openReview(res, a, { preset: 'keep' }); } }, 'Подтвердить оценку'),
-        h('button', { class: 'btn btn-primary btn-xs', onclick: (e) => { e.stopPropagation(); openReview(res, a); } }, 'Изменить оценку')) : null);
+        h('button', { class: 'btn btn-secondary btn-xs', type: 'button', onclick: (e) => { e.stopPropagation(); openReview(res, a); } }, 'Рассмотреть')) : null);
   }
 
-  function openAppeal(res, c) {
+  async function openAppeal(res, c) {
+    const user = await requireUser('Имя попадёт в апелляцию: проверяющий увидит, кто её подал.');
+    if (!user) return;
     const fa = finalAnswers(res);
     const v = verdictOf(c, fa[c.id]?.answer);
-    const ta = h('textarea', { class: 'textarea', rows: 4, placeholder: 'Почему оценка неверна?' });
-    const send = h('button', { class: 'btn btn-primary' }, 'Отправить апелляцию');
+    const ta = h('textarea', { class: 'textarea', rows: 4, placeholder: 'Почему оценка неверна? Сошлитесь на реплики, если можно.' });
+    const send = h('button', { class: 'btn btn-primary', type: 'button' }, 'Отправить апелляцию');
     const m = openModal({
-      title: `Апелляция · ${c.code} ${c.name}`,
-      sub: `Текущая оценка: ${v.text}${v.max != null && fa[c.id]?.answer !== 'na' ? ` / ${v.max}` : ''}`,
-      body: h('div', { class: 'field' }, h('label', null, 'Комментарий'), ta),
+      title: `Подать апелляцию · ${c.code} ${c.name}`,
+      sub: `Сейчас: ${v.text === 'N/A' ? 'не применим' : v.text}${v.max != null && fa[c.id]?.answer !== 'na' ? ` из ${v.max}` : ''} · подаёт ${user.name}`,
+      body: h('div', { class: 'field' }, h('label', null, 'Почему оценку нужно пересмотреть'), ta),
       footer: [h('button', { class: 'btn btn-ghost', onclick: () => m.close() }, 'Отмена'), send],
     });
     setTimeout(() => ta.focus(), 50);
@@ -356,7 +360,7 @@ export function renderDialog(root, cid) {
       if (!ta.value.trim()) { ta.focus(); return; }
       send.disabled = true;
       try {
-        const updated = await api.appeal(res.key, { criterionId: c.id, comment: ta.value.trim() });
+        const updated = await api.appeal(res.key, { criterionId: c.id, comment: ta.value.trim(), author: user.name });
         putResult(updated);
         m.close();
         toast('Апелляция отправлена проверяющему');

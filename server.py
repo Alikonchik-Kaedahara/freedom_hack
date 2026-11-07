@@ -281,6 +281,14 @@ def _with_score(result):
     return result
 
 
+def _person(value):
+    """Name of whoever filed or decided an appeal: one line, at most 80 characters, or None."""
+    if not isinstance(value, str):
+        return None
+    name = " ".join(value.split())[:80]
+    return name or None
+
+
 @app.post("/api/results/<path:key>/appeals")
 def create_appeal(key):
     body = body_json()
@@ -297,7 +305,7 @@ def create_appeal(key):
             raise ValueError("По этому критерию уже есть апелляция на рассмотрении")
         result.setdefault("appeals", []).append({
             "id": uuid.uuid4().hex[:8], "criterionId": crit, "comment": comment,
-            "status": "pending", "createdAt": now(),
+            "status": "pending", "createdAt": now(), "author": _person(body.get("author")),
         })
         return _with_score(result)
 
@@ -344,7 +352,7 @@ def decide_appeal(key, appeal_id):
             if c and answer not in _allowed_answers(c):
                 raise ValueError("Недопустимое значение оценки для этого критерия")
         appeal["status"] = status
-        appeal["decision"] = {"reason": reason, "decidedAt": now(), "answer": answer}
+        appeal["decision"] = {"reason": reason, "decidedAt": now(), "answer": answer, "by": _person(body.get("by"))}
         return _with_score(result)
 
     try:

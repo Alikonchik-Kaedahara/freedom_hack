@@ -54,9 +54,10 @@ def test_appeal_and_decision_recalculate(client):
     ids = import_sample(client)
     evaluate_all(client, ids)
     key = "SAMPLE:sample-ru-002"
-    r = client.post(f"/api/results/{key}/appeals", json={"criterionId": "c5", "comment": "Клиент не жаловался"})
+    r = client.post(f"/api/results/{key}/appeals", json={"criterionId": "c5", "comment": "Клиент не жаловался", "author": "  Томирис   Алимова \n"})
     assert r.status_code == 200 and r.get_json()["score"]["pending"] == 1
     appeal_id = r.get_json()["appeals"][0]["id"]
+    assert r.get_json()["appeals"][0]["author"] == "Томирис Алимова", "author is stored on one line"
     # second pending appeal on the same criterion is refused
     assert client.post(f"/api/results/{key}/appeals", json={"criterionId": "c5", "comment": "ещё"}).status_code == 400
     assert client.post(f"/api/results/{key}/appeals", json={"criterionId": "zzz", "comment": "x"}).status_code == 400
@@ -65,8 +66,12 @@ def test_appeal_and_decision_recalculate(client):
     bad = client.post(f"/api/results/{key}/appeals/{appeal_id}/decision", json={"status": "accepted", "answer": "maybe", "reason": "r"})
     assert bad.status_code == 400
     assert client.post(f"/api/results/{key}/appeals/{appeal_id}/decision", json={"status": "accepted", "answer": "yes"}).status_code == 400
-    ok = client.post(f"/api/results/{key}/appeals/{appeal_id}/decision", json={"status": "accepted", "answer": "yes", "reason": "Недовольства не было"})
+    ok = client.post(f"/api/results/{key}/appeals/{appeal_id}/decision", json={"status": "accepted", "answer": "yes", "reason": "Недовольства не было", "by": "Алихан Е." + "x" * 200})
     assert ok.status_code == 200
+    decision = ok.get_json()["appeals"][0]["decision"]
+    assert decision["by"].startswith("Алихан Е.") and len(decision["by"]) == 80, "decider is stored, capped at 80 characters"
+    report = client.get(f"/report/SAMPLE/sample-ru-002").get_data(as_text=True)
+    assert "Подал: Томирис Алимова" in report and "Решил: Алихан Е." in report
     s = ok.get_json()["score"]
     assert s["originalTotal"] == 40.5 and s["total"] == 55.5 and s["pending"] == 0 and s["changed"] is True
     assert ok.get_json()["answers"]["c5"]["answer"] == "no", "original AI answer is kept"

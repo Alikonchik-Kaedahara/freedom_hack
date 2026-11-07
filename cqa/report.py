@@ -93,8 +93,10 @@ def render(record, result, team_name="", operator_name=""):
             dec = ap.get("decision") or {}
             st_label = {"pending": "на рассмотрении", "accepted": "принята", "rejected": "отклонена"}.get(ap.get("status"), ap.get("status"))
             to = _verdict(c, {"answer": dec.get("answer")}) if dec.get("answer") is not None else None
-            appeals += (f'<div class="ap"><b>Апелляция ({st_label}):</b> {_esc(ap.get("comment"))}'
-                        + (f'<br><b>Решение:</b> {_esc(dec.get("reason"))}' + (f' — оценка изменена на {to}' if to else ' — оценка оставлена') if dec else '')
+            filed = f' <span class="who">Подал: {_esc(ap["author"])}</span>' if ap.get("author") else ""
+            decided = f' <span class="who">Решил: {_esc(dec["by"])}</span>' if dec.get("by") else ""
+            appeals += (f'<div class="ap"><b>Апелляция ({st_label}):</b> {_esc(ap.get("comment"))}{filed}'
+                        + (f'<br><b>Решение:</b> {_esc(dec.get("reason"))}' + (f' — оценка изменена на {to}' if to else ' — оценка оставлена') + decided if dec else '')
                         + '</div>')
         rows.append(
             f'<tr class="st-{st}"><td class="code">{_esc(c.get("code") or "")}</td>'
