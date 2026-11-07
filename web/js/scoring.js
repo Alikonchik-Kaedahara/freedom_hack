@@ -88,7 +88,7 @@ export function disputedIds(result) {
 
 export function disputeLabel(a) {
   if (a?.needsReview) return { text: 'Требует проверки', cls: 'red', why: (a.issues || []).join(' ') };
-  if (a?.confidence === 'low') return { text: 'Низкая уверенность', cls: 'amber', why: 'Модель не уверена в вердикте — проверьте вручную.' };
+  if (a?.confidence === 'low') return { text: 'Низкая уверенность', cls: 'amber', why: 'Система не уверена в ответе — проверьте вручную.' };
   return null;
 }
 
@@ -107,7 +107,7 @@ export function summarize(result) {
 /** Human verdict for one criterion answer. */
 export function verdictOf(c, answer) {
   if (answer === undefined || answer === null) return { text: '—', cls: 'na' };
-  if (answer === 'na') return { text: 'N/A', cls: 'na' };
+  if (answer === 'na') return { text: 'Не применим', cls: 'na' };
   if (c.type === 'flag') return answer === 'yes' ? { text: 'Выявлено', cls: 'fail' } : { text: 'Нет', cls: 'ok' };
   if (c.type === 'scale') {
     const max = scaleMax(c);
@@ -120,11 +120,11 @@ export function verdictOf(c, answer) {
 export function answerOptions(c) {
   if (c.type === 'scale') {
     const opts = [...(c.scale || [])].sort((a, b) => b.value - a.value).map((s) => ({ value: Number(s.value), label: String(s.value) }));
-    if (c.naAllowed) opts.push({ value: 'na', label: 'N/A' });
+    if (c.naAllowed) opts.push({ value: 'na', label: 'Не применим' });
     return opts;
   }
   if (c.type === 'flag') return [{ value: 'yes', label: 'Выявлено' }, { value: 'no', label: 'Нет' }];
   const opts = [{ value: 'yes', label: 'Да' }, { value: 'no', label: 'Нет' }];
-  if (c.naAllowed) opts.push({ value: 'na', label: 'N/A' });
+  if (c.naAllowed) opts.push({ value: 'na', label: 'Не применим' });
   return opts;
 }

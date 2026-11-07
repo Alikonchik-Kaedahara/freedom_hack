@@ -26,7 +26,7 @@ export function byLine(name, iso) {
 
 const verdictText = (c, answer) => {
   const v = verdictOf(c, answer);
-  return c.type === 'scale' && v.max != null && answer !== 'na' ? `${v.text} из ${v.max}` : v.text === 'N/A' ? 'не применим' : v.text;
+  return c.type === 'scale' && v.max != null && answer !== 'na' ? `${v.text} из ${v.max}` : v.text;
 };
 
 function build() {

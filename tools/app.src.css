@@ -426,8 +426,6 @@ p { margin: 0; }
 .panel-body { overflow: auto; flex: 1; min-height: 0; }
 .gross-banner { flex: none; display: flex; align-items: center; gap: 12px; background: var(--cqa-critical-bg); border: 1px solid #000; color: #fff; border-radius: var(--cqa-radius); padding: 10px 12px; margin-bottom: 12px; }
 .gross-banner .gb-icon { position: relative; width: 32px; height: 32px; border-radius: var(--cqa-radius-sm); background: var(--cqa-critical-accent); color: #fff; display: grid; place-items: center; flex: none; }
-.gross-banner .gb-icon::after { content: ""; position: absolute; inset: 0; border-radius: inherit; box-shadow: 0 0 0 0 rgba(239, 68, 68, .7); animation: cqa-pulse 1.8s ease-out infinite; }
-@keyframes cqa-pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, .7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
 .gross-banner b { display: block; font-size: 13px; letter-spacing: .04em; font-family: var(--cqa-font-mono); }
 .gross-banner span { color: rgba(255, 255, 255, .85); font-size: 13px; }
 .gross-banner .btn { background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .25); color: #fff; }
@@ -931,7 +929,6 @@ p { margin: 0; }
 .table .op-link:hover { color: var(--cqa-brand-primary); }
 .table tr:hover .op-link { text-decoration: underline; text-underline-offset: 2px; }
 /* fewer things that blink: the gross-error pulse was a demo effect */
-.gross-banner .gb-icon::after { animation: none; }
 .host-toggle { display: none !important; }
 
 /* ============ v5 · 1. Visual style (ТЗ «интерфейс как готовый продукт») ============ */
@@ -974,7 +971,6 @@ p { margin: 0; }
 .table th, .pop-title, .sec-title, .gross-banner b, .rb-brand .word b, .rb-brand .word small { text-transform: none; }
 /* no glow, no pulse */
 .rb-tabs a.active::after { box-shadow: none; }
-.gross-banner .gb-icon::after { animation: none; box-shadow: none; }
 
 /* ============ v5 · 2. Header and navigation ============ */
 .ribbon { height: 52px; background: #0B3324; gap: 18px; padding: 0 16px; }
@@ -1082,6 +1078,15 @@ a.q-line:hover b { text-decoration: underline; }
 .recalc { font-family: var(--cqa-font-sans); font-variant-numeric: tabular-nums; }
 .appeal-box .who-line { margin-top: 4px; }
 
+/* ============ v5 · 5. Dialog card ============ */
+.gross-banner .gb-text { flex: 1; min-width: 0; font-size: 13.5px; color: var(--cqa-text-primary); line-height: 1.45; }
+.gross-banner .gb-text b { display: inline; color: var(--cqa-fail-text); font-size: 13.5px; }
+.page-head .sub .score { font-size: inherit; font-weight: 700; }
+.total-card .lbl { display: flex; align-items: center; gap: 6px; }
+.info-dot { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1px solid var(--cqa-border-strong); color: var(--cqa-text-muted); font-size: 10.5px; font-weight: 700; font-style: italic; font-family: Georgia, serif; cursor: help; }
+.info-dot:hover, .info-dot:focus-visible { color: var(--cqa-text-primary); border-color: var(--cqa-text-muted); }
+.verdict { font-family: var(--cqa-font-sans); white-space: nowrap; }
+
 /* ============ Medium widths ============ */
 @media (max-width: 1560px) {
   .rb-tabs a .ic { display: none; }
@@ -1116,6 +1121,7 @@ a.q-line:hover b { text-decoration: underline; }
   .ribbon { padding: 0 12px; padding-top: env(safe-area-inset-top); height: calc(var(--cqa-ribbon) + env(safe-area-inset-top)); gap: 8px; }
   .rb-tabs, .host-toggle, .rb-badge, .rb-action { display: none !important; }
   .rb-title, .bridge-badge { display: none !important; }
+  .page-head .h1-word { display: none; }
   .table.appeals-table thead { display: none; }
   .table.appeals-table, .table.appeals-table tbody { display: block; }
   .table.appeals-table tbody tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "crit st" "meta meta"; gap: 4px 10px; padding: 12px 14px; border-bottom: 1px solid var(--cqa-border-hairline); }
@@ -1223,7 +1229,7 @@ a.q-line:hover b { text-decoration: underline; }
   .page.fill[data-tab="score"] .chat-panel, .page.fill[data-tab="chat"] .score-panel { display: none; }
   .card.panel, .panel-body { overflow: visible; }
   .gross-banner { flex-wrap: wrap; }
-  .gross-banner > div:nth-child(2) { flex: 1 1 0; min-width: 0; }
+  .gross-banner .gb-text { flex: 1 1 100%; min-width: 0; }
   .gross-banner .btn { margin-left: 0; width: 100%; }
   .player { position: sticky; top: calc(var(--cqa-ribbon) + env(safe-area-inset-top) + 48px); z-index: 4; flex-wrap: wrap; gap: 8px 10px; }
   .player .time { flex: 1; }

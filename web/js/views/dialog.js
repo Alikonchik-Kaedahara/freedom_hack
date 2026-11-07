@@ -1,14 +1,13 @@
 // Screens 4–7: dialog card — transcript, call player, criteria inspector,
 // evidence jumps, gross error banner and appeal submission.
-import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate } from '../ui.js';
+import { h, icon, fmtScore, scoreClass, channelLabel, openModal, toast, fmtDate, moreMenu } from '../ui.js';
 import { api } from '../api.js';
-import { state, subscribe, resultFor, summaryFor, putResult } from '../store.js';
+import { state, subscribe, resultFor, summaryFor, putResult, keyOf } from '../store.js';
 import { finalAnswers, score, verdictOf, round2, disputeLabel, CONFIDENCE_LABEL } from '../scoring.js';
-import { startEvaluation, startSecondOpinion, isRunning } from '../jobs.js';
+import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { createPlayer } from '../player.js';
 import { openReview, byLine } from './appeals.js';
 import { requireUser } from '../user.js';
-import { setRibbonAction } from '../app.js';
 
 const SPEAKER = { client: 'Клиент', operator: 'Оператор', bot: 'Бот', system: 'Система' };
 const openSets = new Map(); // conversation id -> Set of open criterion ids
@@ -122,44 +121,47 @@ export function renderDialog(root, cid) {
 
   function drawHead() {
     const res = resultFor(cid);
+    const s = summaryFor(cid);
     const running = isRunning(cid) || (state.job?.status === 'running');
-    const mkEval = () => (res ? null : h('button', { class: 'btn btn-primary btn-lg eval-main', disabled: running, onclick: () => startEvaluation([cid]) }, icon('sparkles', 15), 'Оценить диалог'));
-    setRibbonAction(mkEval());
+    const op = (res?.operator || '').trim();
+    const sub = [channelLabel(rec.channel), rec.language, op ? `Оператор ${op}` : null].filter(Boolean).join(' · ');
+    const menu = res ? moreMenu([
+      { label: res.secondOpinion ? 'Второе мнение ещё раз' : 'Второе мнение', onClick: () => confirmSecondOpinion([cid]) },
+      { label: 'Скачать отчёт', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank' },
+      { label: 'Указать оператора', onClick: () => renameOperator(res) },
+    ]) : null;
     headHost.replaceChildren(h('div', { class: 'page-head' },
       h('div', { class: 'head-left' },
-        h('button', { class: 'back-btn', onclick: () => history.length > 1 ? history.back() : (location.hash = '#/dialogs'), 'aria-label': 'Назад' }, icon('back', 17)),
+        h('button', { class: 'back-btn', type: 'button', onclick: () => (history.length > 1 ? history.back() : (location.hash = '#/dialogs')), 'aria-label': 'Назад' }, icon('back', 17)),
         h('div', null,
-          h('h1', null, 'Диалог ', h('span', { class: 'mono' }, cid)),
-          h('div', { class: 'sub' }, `${channelLabel(rec.channel)} · ${rec.language}${res?.operator ? ` · оператор ${res.operator}` : ''}`))),
+          h('h1', null, h('span', { class: 'h1-word' }, 'Диалог '), h('span', { class: 'mono-id' }, cid)),
+          h('div', { class: 'sub' }, sub, s ? [' · ', h('b', { class: `score ${scoreClass(s.total)}` }, fmtScore(s.total))] : null))),
       h('div', { class: 'head-actions' },
-        res ? h('a', { class: 'btn btn-glass', href: `${window.CQA_API_BASE || ''}/report/${encodeURIComponent(state.group)}/${encodeURIComponent(cid)}`, target: '_blank', rel: 'noopener', title: 'Отчёт для печати / PDF' },
-          icon('download', 15), h('span', { class: 'btn-label' }, 'Отчёт')) : null,
-        res ? h('button', { class: 'btn btn-glass', disabled: running, title: res.secondOpinion ? 'Запросить второе мнение ещё раз' : 'Повторная оценка для проверки воспроизводимости', onclick: () => openSecondOpinion(cid), 'aria-label': 'Второе мнение' },
-          icon('refresh', 15), h('span', { class: 'btn-label' }, res.secondOpinion ? 'Второе мнение ✓' : 'Второе мнение')) : null,
-        res
-          ? h('button', { class: 'btn btn-glass', disabled: running, onclick: () => startEvaluation([cid]), 'aria-label': 'Переоценить' }, icon('sparkles', 15), h('span', { class: 'btn-label' }, 'Переоценить'))
-          : mkEval())));
+        h('button', { class: 'btn btn-primary', type: 'button', disabled: running, onclick: () => startEvaluation([cid]) }, res ? 'Переоценить' : 'Оценить'),
+        menu)));
   }
 
-  // Second opinion: same engine (reproducibility) or the other one (cloud vs local). Disagreements become disputed.
-  function openSecondOpinion(cid) {
-    const s = state.settings || {};
-    const current = s.engine === 'local' ? 'local' : 'cloud';
-    const other = current === 'cloud' ? 'local' : 'cloud';
-    const label = (e) => (e === 'cloud' ? `Облачная · ${s.cloud?.model || 'Claude'}` : `Локальная · ${s.local?.model || 'Ollama'}`);
-    let choice = current;
-    const seg = h('div', { class: 'segmented' },
-      h('button', { type: 'button', class: 'on', onclick: (e) => { choice = current; [...seg.children].forEach((b) => b.classList.toggle('on', b === e.currentTarget)); } }, `Та же модель · ${label(current)}`),
-      h('button', { type: 'button', onclick: (e) => { choice = other; [...seg.children].forEach((b) => b.classList.toggle('on', b === e.currentTarget)); } }, `Другая · ${label(other)}`));
-    const go = h('button', { class: 'btn btn-primary' }, icon('refresh', 15), 'Запросить');
+  /** «Указать оператора»: fix the name taken from the first reply; an empty field returns to automatic detection. */
+  function renameOperator(res) {
+    const current = (res.operator || '').trim();
+    const input = h('input', { class: 'input', value: ['Не представился', '[Имя скрыто]'].includes(current) ? '' : current, placeholder: 'Имя оператора', maxlength: 60 });
+    const save = h('button', { class: 'btn btn-primary', type: 'button' }, 'Сохранить');
     const m = openModal({
-      title: 'Второе мнение',
-      sub: 'Диалог оценивается повторно; исходная оценка не меняется. Критерии, по которым ответы разошлись, помечаются как спорные и попадают к проверяющему.',
-      body: h('div', { class: 'field' }, h('label', null, 'Чем оценивать'), seg,
-        h('div', { class: 'muted', style: { marginTop: '8px' } }, 'Та же модель — проверка воспроизводимости. Другая модель — независимое мнение (облако против локальной).')),
-      footer: [h('button', { class: 'btn btn-ghost', onclick: () => m.close() }, 'Отмена'), go],
+      title: 'Указать оператора', sub: 'Пустое поле вернёт имя из первой реплики оператора.',
+      body: h('div', { class: 'field' }, h('label', null, 'Имя'), input),
+      footer: [h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'), save],
     });
-    go.addEventListener('click', () => { m.close(); startSecondOpinion([cid], choice); });
+    setTimeout(() => input.focus(), 30);
+    const go = async () => {
+      save.disabled = true;
+      try {
+        putResult(await api.setOperator(keyOf(cid), input.value.trim()));
+        m.close();
+        toast('Оператор сохранён');
+      } catch (e) { toast(e.message, { type: 'error' }); save.disabled = false; }
+    };
+    save.addEventListener('click', go);
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
   }
 
   function secondOpinionNote(res, c) {
@@ -170,13 +172,12 @@ export function renderDialog(root, cid) {
     const second = so.answers?.[c.id];
     const v2 = verdictOf(c, d.second);
     if (d.status === 'agree') {
-      return h('div', { class: 'so-note agree' }, icon('check', 13), `Второе мнение (${so.engine?.model || so.engine?.type}): совпало — ${v2.text}`);
+      return h('div', { class: 'so-note agree' }, icon('check', 13), `Второе мнение: совпало — ${v2.text}`);
     }
     return h('div', { class: `so-note ${d.status === 'near' ? 'near' : 'disagree'}` },
       icon('alert', 13),
       h('div', null,
-        h('b', null, d.status === 'near' ? 'Второе мнение: соседняя ступень — ' : 'Второе мнение расходится — '), `${v2.text}`,
-        h('span', { class: 'muted' }, ` (${so.engine?.model || so.engine?.type})`),
+        h('b', null, d.status === 'near' ? 'Второе мнение: на ступень рядом — ' : 'Второе мнение расходится — '), `${v2.text}`,
         second?.explanation ? h('div', { class: 'so-expl' }, second.explanation) : null));
   }
 
@@ -202,10 +203,9 @@ export function renderDialog(root, cid) {
     const crit = res.checklist.criteria.find((c) => c.type === 'flag' && fa[c.id]?.answer === 'yes');
     const ev = fa[crit.id]?.evidence || [];
     for (const i of ev) msgEls[i]?.classList.add('gross');
-    bannerHost.replaceChildren(h('div', { class: 'gross-banner' },
-      h('div', { class: 'gb-icon' }, icon('shield', 24)),
-      h('div', null, h('b', null, 'Грубая ошибка'), h('span', null, fa[crit.id]?.explanation || crit.name)),
-      ev.length ? h('button', { class: 'btn btn-glass btn-sm', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true); } }, 'Показать') : null));
+    bannerHost.replaceChildren(h('div', { class: 'gross-banner', role: 'alert' },
+      h('div', { class: 'gb-text' }, h('b', null, 'Грубая ошибка'), ' — ', fa[crit.id]?.explanation || crit.name),
+      ev.length ? h('button', { class: 'btn btn-sm', type: 'button', onclick: () => { open.add(crit.id); drawInspector(); jump(ev, 'flag', null, true); } }, 'Показать в диалоге') : null));
   }
 
   function drawInspector() {
@@ -220,10 +220,9 @@ export function renderDialog(root, cid) {
     if (!res) {
       scoreTabLabel.textContent = 'Оценка';
       inspector.replaceChildren(h('div', { class: 'empty', style: { paddingTop: '80px' } },
-        h('div', { class: 'empty-icon' }, icon('sparkles', 30)),
         h('h3', null, 'Диалог ещё не оценён'),
         h('p', null, `Оценка по чек-листу «${activeChecklistName(rec)}»`),
-        h('button', { class: 'btn btn-primary btn-lg', disabled: state.job?.status === 'running', onclick: () => startEvaluation([cid]) }, icon('sparkles', 18), 'Оценить')));
+        h('button', { class: 'btn btn-primary', type: 'button', disabled: state.job?.status === 'running', onclick: () => startEvaluation([cid]) }, 'Оценить')));
       return;
     }
     const fa = finalAnswers(res);
@@ -232,16 +231,17 @@ export function renderDialog(root, cid) {
     scoreTabLabel.textContent = `Оценка · ${fmtScore(sc.total)}`;
 
     const sections = Object.entries(sc.sections);
-    // Provenance (checklist version, model, cost, prompt hash) stays available on hover, not on screen.
-    const total = h('div', { class: 'total-card', title: provenanceText(res) },
-      h('div', { class: 'lbl' }, 'Итоговый балл'),
+    // Technical details (checklist version, engine, cost, prompt hash) only on hover over ⓘ.
+    const total = h('div', { class: 'total-card' },
+      h('div', { class: 'lbl' }, 'Итоговый балл',
+        h('span', { class: 'info-dot', tabindex: 0, role: 'img', 'aria-label': 'Подробности оценки', title: provenanceText(res) }, 'i')),
       h('div', { class: `val ${scoreClass(sc.total)}` }, fmtScore(sc.total), h('small', null, ' / 100')),
       orig.total !== sc.total ? h('div', { class: 'was' }, 'До апелляции ', h('s', null, fmtScore(orig.total))) : null,
       sections.length > 1 ? h('div', { class: 'sections' }, sections.map(([name, s]) =>
         h('div', { class: 'section-row' },
           h('span', { class: 'n' }, name),
           h('div', { class: 'bar' }, h('i', { style: { width: `${s.pct ?? 0}%` } })),
-          h('span', { class: 'p' }, s.pct == null ? 'N/A' : `${Math.round(s.pct)}%`)))) : null);
+          h('span', { class: 'p' }, s.pct == null ? '—' : `${Math.round(s.pct)}%`)))) : null);
 
     const groups = [];
     let lastSec = null;
@@ -318,11 +318,11 @@ export function renderDialog(root, cid) {
   // Base weight from the checklist, the weight after N/A redistribution, and the points earned.
   function pointsText(c, p, sc) {
     if (c.type === 'flag') return h('span', { class: 'weights' }, h('span', null, 'Без баллов · отмечается отдельно'));
-    if (p.points == null) return h('span', { class: 'weights' }, h('span', null, 'Базовый вес ', h('b', null, c.weight)), h('span', { class: 'shift' }, 'N/A → вес перераспределён'));
+    if (p.points == null) return h('span', { class: 'weights' }, h('span', null, 'Базовый вес ', h('b', null, c.weight)), h('span', { class: 'shift' }, 'Не применим → вес перераспределён'));
     const redistributed = sc.possible > 0 && Math.abs(sc.possible - 100) > 0.001;
     return h('span', { class: 'weights' },
       h('span', null, 'Базовый вес ', h('b', null, c.weight)),
-      redistributed ? h('span', { class: 'shift' }, 'После N/A ', h('b', null, p.effWeight)) : h('span', null, 'Перераспределения нет'),
+      redistributed ? h('span', { class: 'shift' }, 'После перераспределения ', h('b', null, p.effWeight)) : h('span', null, 'Перераспределения нет'),
       h('span', null, 'Баллы ', h('b', null, redistributed ? `${p.effPoints} / ${p.effWeight}` : `${round2(p.points)} / ${c.weight}`)));
   }
 
@@ -351,7 +351,7 @@ export function renderDialog(root, cid) {
     const send = h('button', { class: 'btn btn-primary', type: 'button' }, 'Отправить апелляцию');
     const m = openModal({
       title: `Подать апелляцию · ${c.code} ${c.name}`,
-      sub: `Сейчас: ${v.text === 'N/A' ? 'не применим' : v.text}${v.max != null && fa[c.id]?.answer !== 'na' ? ` из ${v.max}` : ''} · подаёт ${user.name}`,
+      sub: `Сейчас: ${v.text}${v.max != null && fa[c.id]?.answer !== 'na' ? ` из ${v.max}` : ''} · подаёт ${user.name}`,
       body: h('div', { class: 'field' }, h('label', null, 'Почему оценку нужно пересмотреть'), ta),
       footer: [h('button', { class: 'btn btn-ghost', onclick: () => m.close() }, 'Отмена'), send],
     });

@@ -14,7 +14,7 @@ const svg = (tag, attrs, ...kids) => {
   return el;
 };
 
-const VALUE = (v) => (v == null ? '—' : v === 'na' ? 'N/A' : v === 'yes' ? 'Да' : v === 'no' ? 'Нет' : String(v));
+const VALUE = (v) => (v == null ? '—' : v === 'na' ? 'не применим' : v === 'yes' ? 'Да' : v === 'no' ? 'Нет' : String(v));
 const pct = (v) => (v == null ? '—' : `${Math.round(v)}%`);
 const tone = (v) => (v == null ? 'none' : v >= 85 ? 'ok' : v >= 65 ? 'part' : 'fail');
 
