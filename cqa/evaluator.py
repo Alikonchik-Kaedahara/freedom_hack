@@ -432,8 +432,10 @@ def _local_target(settings):
 
 
 def _relay_env():
-    return (os.environ.get("CQA_LOCAL_RELAY_URL", "").strip(),
-            os.environ.get("CQA_LOCAL_RELAY_TOKEN", "").strip())
+    # CQA_RELAY_TOKEN is the name the relay itself uses (.env.relay on the Ollama machine);
+    # accept it too, so one token variable works under either name.
+    token = os.environ.get("CQA_LOCAL_RELAY_TOKEN", "").strip() or os.environ.get("CQA_RELAY_TOKEN", "").strip()
+    return os.environ.get("CQA_LOCAL_RELAY_URL", "").strip(), token
 
 
 def local_relay_enabled():
