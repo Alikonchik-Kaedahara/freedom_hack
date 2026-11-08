@@ -64,6 +64,7 @@ FLOW_SCORES = {
 }
 FLOW_EVENTS = [*FLOW_SCORES, "too_little_exchange"]
 EMPATHY_RESPONSES = ["civil", "addresses_concern", "rude_or_dismissive", "uncertain"]
+EMPATHY_FINDINGS = ["respectful", "specific_response", "operator_disrespect", "neglected_impact", "insufficient"]
 
 FLOW_NOTE = """Сначала проследи самый серьёзный наблюдаемый сбой в репликах оператора. В flowEvent выбери его тип:
 clear — клиенту понятны ответы, включая новую тему, уточнение детали или сверку понимания (10).
@@ -99,9 +100,28 @@ DISCOVERY_NOTE = """Сначала установи, какого конкрет
 не изложив вопрос, примени условие N/A. Даже когда последующий ответ оператора был плохим, для «Нет» здесь \
 нужно назвать действительно недостающую деталь, необходимую для ответа, или ненужный повтор уже известного."""
 
-EMPATHY_NOTE = """Уточнение клиента и указание на пропущенную часть вопроса могут быть нейтральными. Если \
-клиент выразил неудобство, поясни, что именно он сказал и как оператор на это отреагировал. Формальное отсутствие \
-извинения само по себе не определяет оценку. Невежливость самого оператора тоже учитывается."""
+EMPATHY_NOTE = """Оцени отношение оператора к человеку. Для нейтрального делового запроса достаточно уважительной \
+манеры. «У меня ещё нет документа», планируемая дата поездки, оставшийся вопрос или просьба повторить инструкцию \
+описывают ситуацию. Не приписывай клиенту обиду, тревогу или ущерб только потому, что услуга не оказана.
+В empathyFinding выбери ровно одно наблюдение:
+respectful — общение корректно, невыслушанной конкретной жалобы нет (Да). Требовать обязательное извинение нельзя.
+specific_response — оператор прямо признал именно высказанное опасение или предложил действие, которое облегчает \
+именно названное неудобство (Да). Достаточно одного из этих способов. Даже при ошибочной инструкции признание \
+конкретного страха клиента может соответствовать 05. Полноту и логичность оцени отдельно.
+operator_disrespect — сам оператор оскорбил, высмеял или прямо обесценил клиента (Нет). Слова бота или клиента \
+не засчитывай в качестве высказывания оператора.
+neglected_impact — клиент своими словами выразил недовольство, опасение или конкретные негативные последствия \
+(например, потерю времени на повторную поездку); затем оператор успел ответить и оставил именно это без реакции (Нет). \
+Не выдумывай последствия за клиента. «Я понял, но мне всё ещё нужна дата» само по себе не жалоба. \
+«Я зря ездил за документом дважды» описывает реальную потерю, даже без слов об эмоциях. Проверь также, не предложил \
+ли оператор конкретный способ избежать третьей поездки. Одного общего «понимаю» для выраженной проблемы мало, \
+но адресное «понимаю вашу тревогу из-за двойного списания» уже признаёт её.
+insufficient — недостаточно реплик для вывода; используй low и объясни почему.
+В empathyQuote при operator_disrespect приведи точные слова оператора, при neglected_impact — точные слова \
+клиента о негативном воздействии, при specific_response — слова оператора с адресной реакцией. Бери цитату \
+из evidence на исходном языке, без внешних кавычек. Для respectful или insufficient допустима пустая строка. \
+Обоснование дай по содержанию конкретных реплик."""
+
 
 CLOSURE_NOTE = """Прочитай последнюю реплику оператора целиком и предыдущие завершающие реплики. Отдельно \
 проверь наличие итога или предложения помощи и наличие прощания. Перечисление того, что успели сделать, — \
@@ -224,6 +244,9 @@ def build_schema(checklist, with_knowledge=False):
         if rule == "dialogue":
             fields["flowEvent"] = {"type": "string", "enum": FLOW_EVENTS}
             fields["disruptionTurns"] = turns
+        elif rule == "empathy":
+            fields["empathyFinding"] = {"type": "string", "enum": EMPATHY_FINDINGS}
+            fields["empathyQuote"] = {"type": "string"}
         fields.update({
             "evidence": {"type": "array", "items": {"type": "integer"}},
             "explanation": {"type": "string"},
@@ -305,7 +328,8 @@ def _flow_issues(answer, disruptions, transcript):
         yield "Для максимума объясни связь вопроса и ответа и приведи точную цитату «…» из отмеченной реплики оператора."
 
 
-def _empathy_issues(answer, transcript):
+def _legacy_empathy_issues(answer, transcript):
+    """Replay assessments made with the former concernTurns/empathyResponse schema."""
     cues, response = answer["concernTurns"], answer["empathyResponse"]
     evidence = answer["evidence"]
     client_evidence = {i for i in evidence if transcript[i].get("speaker") == "client"}
@@ -327,6 +351,36 @@ def _empathy_issues(answer, transcript):
     expected = "yes" if positive else "no"
     if answer["answer"] != expected:
         yield f"При отмеченных репликах и типе реакции ожидается {expected}. Сверь тон, реакцию и вердикт."
+
+
+def _empathy_issues(answer, transcript):
+    finding = answer["empathyFinding"]
+    if finding not in EMPATHY_FINDINGS:
+        yield "Определи наблюдаемое отношение оператора к клиенту."
+        return
+    if finding == "insufficient":
+        if answer["confidence"] != "low":
+            yield "Для вывода при недостатке реплик укажи низкую уверенность."
+        return
+    evidence = answer["evidence"]
+    operators = [i for i in evidence if transcript[i].get("speaker") == "operator"]
+    if not operators:
+        yield "Укажи реплику самого оператора, на которой основан вывод о его реакции."
+    expected = "no" if finding in ("operator_disrespect", "neglected_impact") else "yes"
+    if answer["answer"] != expected:
+        yield f"При выбранном отношении ожидается {expected}; проверь само наблюдение и ответ."
+    if finding == "respectful":
+        return
+    speaker = "client" if finding == "neglected_impact" else "operator"
+    raw_quote = answer["empathyQuote"]
+    quote = " ".join(raw_quote.split()) if isinstance(raw_quote, str) else ""
+    matching = [i for i in evidence if transcript[i].get("speaker") == speaker
+                and quote in " ".join((transcript[i].get("text") or "").split())]
+    if not any(ch.isalnum() for ch in quote) or not matching:
+        who = "клиента" if speaker == "client" else "оператора"
+        yield f"Приведи в empathyQuote дословный фрагмент отмеченной реплики {who}."
+    elif finding == "neglected_impact" and not any(o > c for c in matching for o in operators):
+        yield "Укажи ответ оператора после того, как клиент сообщил о негативных последствиях."
 
 
 def validate(raw, checklist, record, known_facts=None, *, replayed=False):
@@ -414,9 +468,13 @@ def validate(raw, checklist, record, known_facts=None, *, replayed=False):
                 answers[c["id"]]["flowEvent"] = item.get("flowEvent")
             for issue in _flow_issues(answers[c["id"]], disruptions, transcript):
                 problem(c, "flow_evidence", f"Критерий {label}: {issue}")
-        if rule == "empathy" and ("concernTurns" in item or "empathyResponse" in item):
-            answers[c["id"]].update(concernTurns=item.get("concernTurns"), empathyResponse=item.get("empathyResponse"))
+        if rule == "empathy" and (not replayed or "empathyFinding" in item or "empathyQuote" in item):
+            answers[c["id"]].update(empathyFinding=item.get("empathyFinding"), empathyQuote=item.get("empathyQuote"))
             for issue in _empathy_issues(answers[c["id"]], transcript):
+                problem(c, "empathy_evidence", f"Критерий {label}: {issue}")
+        elif rule == "empathy" and ("concernTurns" in item or "empathyResponse" in item):
+            answers[c["id"]].update(concernTurns=item.get("concernTurns"), empathyResponse=item.get("empathyResponse"))
+            for issue in _legacy_empathy_issues(answers[c["id"]], transcript):
                 problem(c, "empathy_evidence", f"Критерий {label}: {issue}")
         if is_consultation(c) and isinstance(item.get("contradicts"), list):
             ids = [str(x) for x in item["contradicts"] if isinstance(x, (str, int))]

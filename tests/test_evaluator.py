@@ -35,7 +35,7 @@ def good_raw(checklist=CHAT):
             verdict = "yes"
         raw[c["id"]] = {"verdict": verdict, "evidence": [2, 4], "explanation": "ok", "confidence": "high"}
     raw["c3"] = {"verdict": "na", "evidence": [1], "explanation": "общий вопрос", "confidence": "high"}
-    raw["c5"].update(concernTurns=[], empathyResponse="civil")
+    raw["c5"].update(empathyFinding="respectful", empathyQuote="")
     raw["c6"].update(evidence=[1, 2, 4], disruptionTurns=[], flowEvent="clear",
                      explanation="На вопрос о комиссии оператор попросил «Уточните тариф, пожалуйста.» и сообщил ставку.")
     raw["c8"]["evidence"] = []
@@ -218,11 +218,11 @@ def test_understood_but_unresolved_and_a_client_repair_are_different_flow_events
     ("rude_or_dismissive", [], "no", True), ("rude_or_dismissive", [], "yes", False),
     ("civil", [2], "no", False), ("civil", [99], "no", False),
 ])
-def test_empathy_checks_the_actor_and_matches_the_verdict_to_the_observation(response, cues, verdict, ok):
+def test_replay_checks_legacy_empathy_observations(response, cues, verdict, ok):
     cl = {"criteria": [CHAT["criteria"][4]]}
     item = dict(verdict=verdict, confidence="high", evidence=[1, 2], concernTurns=cues,
                 empathyResponse=response, explanation="Описание наблюдаемой реакции.")
-    _, problems = evaluator.validate({"c5": item}, cl, RECORD)
+    _, problems = evaluator.validate({"c5": item}, cl, RECORD, replayed=True)
     assert (not problems) == ok
 
 
@@ -231,13 +231,35 @@ def test_preserve_replay_across_observation_schema_versions():
     current, problems = evaluator.validate(raw, CHAT, RECORD)
     assert not problems
     assert not evaluator.validate(replay._to_raw(current), CHAT, RECORD, replayed=True)[1]
-    for key in ("empathyResponse", "concernTurns"):
+    for key in ("empathyFinding", "empathyQuote"):
         del raw["c5"][key]
     del raw["c6"]["flowEvent"]  # previous schema still had disruptionTurns
     _, problems = evaluator.validate(raw, CHAT, RECORD, replayed=True)
     assert not problems
     _, problems = evaluator.validate(raw, CHAT, RECORD)
-    assert {p["criterionId"] for p in problems} == {"c6"}
+    assert {p["criterionId"] for p in problems} == {"c5", "c6"}
+
+
+@pytest.mark.parametrize("finding,quote,indices,verdict,valid", [
+    ("respectful", "", [0, 1], "yes", True),
+    ("specific_response", "сэкономить вам ещё одну поездку", [2, 3], "yes", True),
+    ("specific_response", "Я потерял день", [2, 3], "yes", False),
+    ("neglected_impact", "Я потерял день", [1, 2], "no", False),  # no subsequent operator in evidence
+    ("neglected_impact", "Я потерял день", [2, 3], "yes", False),
+    ("operator_disrespect", "Мне всё равно", [2, 4], "no", True),
+    ("operator_disrespect", "Мне всё равно", [2, 3], "no", False),
+])
+def test_empathy_quotes_require_the_right_role_and_an_opportunity_to_respond(finding, quote, indices, verdict, valid):
+    rec = {"transcript": [{"speaker": "client", "text": "Когда будет копия?"},
+                          {"speaker": "operator", "text": "Даты пока нет."},
+                          {"speaker": "client", "text": "Я потерял день на дорогу."},
+                          {"speaker": "operator", "text": "Хочу сэкономить вам ещё одну поездку."},
+                          {"speaker": "operator", "text": "Мне всё равно."}]}
+    cl = {"criteria": [CHAT["criteria"][4]]}
+    raw = {"c5": {"empathyFinding": finding, "empathyQuote": quote, "evidence": indices, "verdict": verdict,
+                  "confidence": "high", "explanation": "Оценка по отмеченным репликам."}}
+    _, issues = evaluator.validate(raw, cl, rec)
+    assert (not issues) == valid
 
 
 def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edits():
@@ -250,7 +272,7 @@ def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edi
         edited["criteria"][1]["naRule"] = "Другое условие неприменимости."
         assert evaluator.DISCOVERY_NOTE not in evaluator.render_checklist(edited)
         edited["criteria"][4]["description"] = "Оцените другой навык."
-        assert "concernTurns" not in evaluator.build_schema(edited)["properties"]["c5"]["properties"]
+        assert "empathyFinding" not in evaluator.build_schema(edited)["properties"]["c5"]["properties"]
 
 
 def test_cloud_client_accepts_a_key_from_settings(monkeypatch):
