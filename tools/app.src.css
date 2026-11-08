@@ -1490,3 +1490,4 @@ a.q-line:hover b { text-decoration: underline; }
   .score-range { width: 100%; }
   .score-range .chips { flex-wrap: wrap; margin: 0; padding: 0; width: auto; overflow: visible; }
 }
+.reg-toolbar .score-range { flex-basis: 100%; padding-top: 2px; }

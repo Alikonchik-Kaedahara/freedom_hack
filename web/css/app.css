@@ -1459,3 +1459,4 @@ from { transform: translateY(100%); }
 #cqa-d365-root .score-range { width: 100%; }
 #cqa-d365-root .score-range .chips { flex-wrap: wrap; margin: 0; padding: 0; width: auto; overflow: visible; }
 }
+#cqa-d365-root .reg-toolbar .score-range { flex-basis: 100%; padding-top: 2px; }

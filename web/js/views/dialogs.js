@@ -7,15 +7,30 @@ import { startEvaluation, confirmSecondOpinion, isRunning } from '../jobs.js';
 import { codeOf, criterionChoices, criterionControls, criterionEntries, hasCriteria, matchingCriteria, readCriteria, severityOf, worstRank, writeCriteria } from '../criterion-filter.js';
 import { openExportModal } from './export.js';
 
-const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, review: false, reviewed: false, q: '' };
+const filters = { lang: new Set(), channel: new Set(), gross: false, appeal: false, disputed: false, review: false, reviewed: false, q: '', min: null, max: null, inclusive: false };
+// Score filter: quick bands are half-open («40–60» is 40 ≤ балл < 60), typed limits are inclusive.
+const SCORE_BANDS = [
+  { label: 'ниже 40', min: null, max: 40 },
+  { label: '40–60', min: 40, max: 60 },
+  { label: '60–80', min: 60, max: 80 },
+  { label: '80 и выше', min: 80, max: null },
+];
+const hasRange = () => filters.min != null || filters.max != null;
+const inRange = (v) => {
+  if (v == null) return false;
+  if (filters.min != null && v < filters.min) return false;
+  if (filters.max != null && (filters.inclusive ? v > filters.max : v >= filters.max)) return false;
+  return true;
+};
 const selected = new Set();
 const sort = { key: null, dir: 1 }; // key: 'score' | 'operator' | null (set order)
 const UNNAMED = new Set(['', 'Не представился', '[Имя скрыто]']);
 
-const anyFilter = () => filters.lang.size || filters.channel.size || filters.gross || filters.appeal || filters.disputed || filters.review || filters.reviewed || filters.q.trim();
+const anyFilter = () => filters.lang.size || filters.channel.size || filters.gross || filters.appeal || filters.disputed || filters.review || filters.reviewed || filters.q.trim() || hasRange();
 function resetFilters() {
   filters.lang.clear(); filters.channel.clear();
   filters.gross = false; filters.appeal = false; filters.disputed = false; filters.review = false; filters.reviewed = false; filters.q = '';
+  filters.min = null; filters.max = null; filters.inclusive = false;
 }
 
 export function renderDialogs(root) {
@@ -81,6 +96,7 @@ export function renderDialogs(root) {
         if (!res?.checklist.criteria.some((c) => currentReview(res, c.id)) || reviewCriteria(r.conversation_id).length) return false;
       }
       if (filters.q && !matchOf(r)) return false;
+      if (hasRange() && !inRange(s?.total)) return false;
       return true;
     });
     if (criterionFilter.severity) {
@@ -156,7 +172,37 @@ export function renderDialogs(root) {
         chip('Проверенные', filters.reviewed, () => { filters.reviewed = !filters.reviewed; filters.review = filters.disputed = filters.gross = false; }),
         chip('Грубая ошибка', filters.gross, () => (filters.gross = !filters.gross), true),
         chip('Апелляция', filters.appeal, () => (filters.appeal = !filters.appeal)),
-        chip('Спорные', filters.disputed, () => (filters.disputed = !filters.disputed)))));
+        chip('Спорные', filters.disputed, () => (filters.disputed = !filters.disputed))),
+      scoreRange()));
+  };
+
+  // Итоговый балл: quick bands plus two inputs for any limits («больше 20», «между 60 и 80»).
+  const scoreRange = () => {
+    const minInput = h('input', { class: 'input', type: 'number', min: 0, max: 100, step: 1, placeholder: 'от', 'aria-label': 'Итоговый балл от', value: filters.min ?? '' });
+    const maxInput = h('input', { class: 'input', type: 'number', min: 0, max: 100, step: 1, placeholder: 'до', 'aria-label': 'Итоговый балл до', value: filters.max ?? '' });
+    const num = (el) => { const v = el.value.trim(); if (v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null; };
+    const onTyped = () => { filters.min = num(minInput); filters.max = num(maxInput); filters.inclusive = true; drawBands(); drawRows(); };
+    minInput.addEventListener('input', onTyped);
+    maxInput.addEventListener('input', onTyped);
+    const bands = h('div', { class: 'chips' });
+    const setRange = (min, max, inclusive) => {
+      filters.min = min; filters.max = max; filters.inclusive = inclusive;
+      minInput.value = min ?? ''; maxInput.value = max ?? '';
+      drawBands(); drawRows();
+    };
+    function drawBands() {
+      const chips = SCORE_BANDS.map((b) => {
+        const on = !filters.inclusive && filters.min === b.min && filters.max === b.max;
+        return h('button', { class: `chip ${on ? 'on' : ''}`, type: 'button', 'aria-pressed': String(on),
+          onclick: () => (on ? setRange(null, null, false) : setRange(b.min, b.max, false)) }, b.label);
+      });
+      if (hasRange()) chips.push(h('button', { class: 'link-btn', type: 'button', onclick: () => setRange(null, null, false) }, 'Сбросить'));
+      bands.replaceChildren(...chips);
+    }
+    drawBands();
+    return h('div', { class: 'score-range', role: 'group', 'aria-label': 'Фильтр по итоговому баллу' },
+      h('span', { class: 'range-label' }, 'Итоговый балл'), bands,
+      h('span', { class: 'range-inputs' }, minInput, h('span', { class: 'muted' }, '—'), maxInput));
   };
 
   // Batch actions for the checked rows, right above the table where the checkboxes are.
