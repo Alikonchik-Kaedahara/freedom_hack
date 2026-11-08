@@ -12,6 +12,7 @@ os.environ.pop("ANTHROPIC_API_KEY", None)
 os.environ.pop("ANTHROPIC_BASE_URL", None)
 os.environ.pop("CQA_LOCAL_RELAY_URL", None)
 os.environ.pop("CQA_LOCAL_RELAY_TOKEN", None)
+os.environ.pop("CQA_RELAY_TOKEN", None)
 
 
 @pytest.fixture

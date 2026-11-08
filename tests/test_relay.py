@@ -196,6 +196,18 @@ def test_relay_env_overrides_url_and_sends_bearer(monkeypatch):
     assert all(h == {"Authorization": f"Bearer {TOKEN}"} for _, h in calls)
 
 
+def test_relay_token_also_read_under_relay_name(monkeypatch):
+    # Railway may carry the token under the relay's own name, CQA_RELAY_TOKEN.
+    monkeypatch.setenv("CQA_LOCAL_RELAY_URL", "https://relay.example")
+    monkeypatch.delenv("CQA_LOCAL_RELAY_TOKEN", raising=False)
+    monkeypatch.setenv("CQA_RELAY_TOKEN", TOKEN)
+    assert evaluator.local_relay_enabled() is True
+    url, headers = evaluator._local_target(SETTINGS)
+    assert url == "https://relay.example" and headers == {"Authorization": f"Bearer {TOKEN}"}
+    monkeypatch.setenv("CQA_LOCAL_RELAY_TOKEN", "x" * 40)
+    assert evaluator._local_target(SETTINGS)[1] == {"Authorization": "Bearer " + "x" * 40}, "the server's own name wins"
+
+
 def test_relay_errors_do_not_echo_tunnel_url(monkeypatch):
     monkeypatch.setenv("CQA_LOCAL_RELAY_URL", "https://secret-words.trycloudflare.com")
     monkeypatch.setenv("CQA_LOCAL_RELAY_TOKEN", TOKEN)
