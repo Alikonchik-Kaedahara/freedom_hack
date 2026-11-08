@@ -148,6 +148,22 @@ def test_import_without_data_api_explains(client):
     assert client.post("/api/datasets/import", data="x", content_type="application/json").status_code == 400
 
 
+def test_queued_evaluations_keep_the_models_selected_at_start(client, monkeypatch):
+    import server
+    ids = import_sample(client)[:2]
+    queued, seen = [], []
+    monkeypatch.setattr(server._pool, "submit", lambda fn, cid: queued.append((fn, cid)))
+    monkeypatch.setattr(server, "check_engine", lambda settings: {"ok": True})
+    monkeypatch.setattr(server, "_run_one", lambda job, group, cid, override, settings: seen.append(settings))
+    resp = client.post("/api/evaluate", json={"groupId": "SAMPLE", "conversationIds": ids, "engine": "cloud"})
+    assert resp.status_code == 200 and resp.get_json()["engine"] == "cloud"
+    assert storage.get_settings()["engine"] == "replay"
+    storage.save_settings({"cloud": {"model": "different-model"}})
+    for fn, cid in queued:
+        fn(cid)
+    assert len(seen) == 2 and all(s["engine"] == "cloud" and s["cloud"]["model"] != "different-model" for s in seen)
+
+
 def test_upload_transcript_file(client):
     sample = open(os.path.join(replay.SAMPLE_DIR, "dataset.json"), "rb").read()
     r = client.post("/api/datasets/upload", data={"file": (io.BytesIO(sample), "my_dialogs.json")}, content_type="multipart/form-data")

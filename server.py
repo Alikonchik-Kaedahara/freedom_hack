@@ -494,9 +494,8 @@ def _checklist_for(record, settings, override_id):
     return storage.get_checklist(cid) if cid else None
 
 
-def _run_one(job_id, group_id, cid, override_id):
+def _run_one(job_id, group_id, cid, override_id, settings):
     job = JOBS[job_id]
-    settings = storage.get_settings()
     record = storage.get_record(group_id, cid)
     with _jobs_lock:
         job["current"].append(cid)
@@ -559,20 +558,24 @@ def start_evaluation():
     override = body.get("checklistId")
     if override and not storage.get_checklist(override):
         return bad("Чек-лист не найден", 404)
-    settings = storage.get_settings()
+    engine = body.get("engine")
+    if engine not in (None, "", "cloud", "local"):
+        return bad("Движок оценки: cloud или local")
+    settings = _engine_settings(storage.get_settings(), engine)
     status = check_engine(settings)
     if not status["ok"]:
         return bad(status["message"], 412)
     ids = list(dict.fromkeys(ids))
     job_id = uuid.uuid4().hex[:10]
     JOBS[job_id] = {"id": job_id, "total": len(ids), "done": 0, "failed": 0, "needsReview": 0, "errors": [],
-                    "current": [], "status": "running", "startedAt": now(), "groupId": group_id, "ids": ids}
+                    "current": [], "status": "running", "startedAt": now(), "groupId": group_id, "ids": ids,
+                    "engine": settings.get("engine")}
     workers = 1 if settings.get("engine") == "local" else 4
     sem = threading.Semaphore(workers)
 
     def run(cid):
         with sem:
-            _run_one(job_id, group_id, cid, override)
+            _run_one(job_id, group_id, cid, override, settings)
 
     for cid in ids:
         _pool.submit(run, cid)
@@ -580,7 +583,7 @@ def start_evaluation():
 
 
 def _engine_settings(settings, engine_override):
-    """Settings for a second pass: same engine by default, or the one asked for (cloud / local)."""
+    """Select an engine for this job without changing the shared settings."""
     if not engine_override:
         return settings
     s = dict(settings)
@@ -588,10 +591,9 @@ def _engine_settings(settings, engine_override):
     return s
 
 
-def _run_second(job_id, group_id, cid, engine_override):
+def _run_second(job_id, group_id, cid, settings):
     """Second opinion: evaluate again, store next to the original, flag disagreements."""
     job = JOBS[job_id]
-    settings = _engine_settings(storage.get_settings(), engine_override)
     record = storage.get_record(group_id, cid)
     key = storage.result_key(group_id, cid)
     with _jobs_lock:
@@ -669,7 +671,7 @@ def start_second_opinion():
 
     def run(cid):
         with sem:
-            _run_second(job_id, group_id, cid, engine_override)
+            _run_second(job_id, group_id, cid, settings)
 
     for cid in ids:
         _pool.submit(run, cid)

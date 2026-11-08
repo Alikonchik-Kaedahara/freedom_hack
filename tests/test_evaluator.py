@@ -237,7 +237,7 @@ def test_preserve_replay_across_observation_schema_versions():
     _, problems = evaluator.validate(raw, CHAT, RECORD, replayed=True)
     assert not problems
     _, problems = evaluator.validate(raw, CHAT, RECORD)
-    assert {p["criterionId"] for p in problems} == {"c5", "c6"}
+    assert {p["criterionId"] for p in problems} == {"c6"}
 
 
 def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edits():

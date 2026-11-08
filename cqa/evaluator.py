@@ -99,19 +99,9 @@ DISCOVERY_NOTE = """Сначала установи, какого конкрет
 не изложив вопрос, примени условие N/A. Даже когда последующий ответ оператора был плохим, для «Нет» здесь \
 нужно назвать действительно недостающую деталь, необходимую для ответа, или ненужный повтор уже известного."""
 
-EMPATHY_NOTE = """Установи, о каком неудобстве, тревоге, недовольстве или последствиях прямо сообщил клиент \
-и была ли у оператора возможность отреагировать. В concernTurns укажи номера этих реплик клиента из evidence. \
-Нейтральное «дата неизвестна», «вторая часть осталась открытой», несогласие с правилом или уточняющий вопрос \
-сами по себе не свидетельствуют о такой эмоции; тогда concernTurns может быть [].
-В empathyResponse выбери наблюдаемое поведение оператора. civil — говорил уважительно; конкретной реакции на \
-выраженное неудобство не было. При пустом concernTurns это Да, при проигнорированном конкретном неудобстве — Нет. \
-addresses_concern — признал названную проблему или предложил действие именно для облегчения её последствий (Да). \
-Для этого не обязательно извиняться, обещать невозможное или решить весь запрос. За одну формулу вежливости или \
-сочувствие бота заслугу оператору не приписывай. rude_or_dismissive — сам нагрубил или явно отмахнулся (Нет, \
-даже если дал ясный ответ). uncertain — по репликам не установить, что произошло; используй low и объясни почему.
-В объяснении сошлись на фактическое высказывание клиента и поступок или слова оператора. Нейтральный \
-деловой тон можно оценить на Да и при нерешённой задаче. Оценивай тон и реакцию, а не полноту консультации."""
-
+EMPATHY_NOTE = """Уточнение клиента и указание на пропущенную часть вопроса могут быть нейтральными. Если \
+клиент выразил неудобство, поясни, что именно он сказал и как оператор на это отреагировал. Формальное отсутствие \
+извинения само по себе не определяет оценку. Невежливость самого оператора тоже учитывается."""
 
 CLOSURE_NOTE = """Прочитай последнюю реплику оператора целиком и предыдущие завершающие реплики. Отдельно \
 проверь наличие итога или предложения помощи и наличие прощания. Перечисление того, что успели сделать, — \
@@ -234,9 +224,6 @@ def build_schema(checklist, with_knowledge=False):
         if rule == "dialogue":
             fields["flowEvent"] = {"type": "string", "enum": FLOW_EVENTS}
             fields["disruptionTurns"] = turns
-        elif rule == "empathy":
-            fields["concernTurns"] = turns
-            fields["empathyResponse"] = {"type": "string", "enum": EMPATHY_RESPONSES}
         fields.update({
             "evidence": {"type": "array", "items": {"type": "integer"}},
             "explanation": {"type": "string"},
@@ -427,7 +414,7 @@ def validate(raw, checklist, record, known_facts=None, *, replayed=False):
                 answers[c["id"]]["flowEvent"] = item.get("flowEvent")
             for issue in _flow_issues(answers[c["id"]], disruptions, transcript):
                 problem(c, "flow_evidence", f"Критерий {label}: {issue}")
-        if rule == "empathy" and (not replayed or "concernTurns" in item or "empathyResponse" in item):
+        if rule == "empathy" and ("concernTurns" in item or "empathyResponse" in item):
             answers[c["id"]].update(concernTurns=item.get("concernTurns"), empathyResponse=item.get("empathyResponse"))
             for issue in _empathy_issues(answers[c["id"]], transcript):
                 problem(c, "empathy_evidence", f"Критерий {label}: {issue}")
