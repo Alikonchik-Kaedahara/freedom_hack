@@ -29,16 +29,26 @@ export function renderChecklists(root, id) {
     page.append(h('p', { class: 'muted' }, 'Не удалось загрузить чек-листы. Обновите страницу.'));
     return;
   }
-  let saveBtn = null;
+  // Controls whose state depends on "dirty"/"valid"; updated in place by syncDirty().
+  let saveBtn = null, cancelBtn = null, activeBtn = null, deleteBtn = null, applyBtn = null, applyHint = null;
   const isValid = () => {
     const sum = round2(draft.criteria.filter((c) => c.type !== 'flag').reduce((a, c) => a + (Number(c.weight) || 0), 0));
     return sum === 100 && draft.criteria.every((c) => c.name.trim()) && draft.criteria.every((c) => c.type !== 'scale' || (c.scale || []).length >= 2);
   };
-  const syncSave = () => { if (saveBtn) saveBtn.disabled = !(dirty && isValid()); };
+  const applyIds = () => state.records.filter((r) => r.channel === draft.channel).map((r) => r.conversation_id);
+  // Typing never rebuilds the page: a rebuild on blur would replace the button the user is clicking
+  // (the click is lost) and steal focus from the field they just moved to. Text fields update the
+  // DOM in place and only sync the buttons; structural changes (add/delete/type) redraw via markDirty.
+  const syncDirty = () => {
+    const ok = isValid();
+    if (saveBtn) saveBtn.disabled = !(dirty && ok);
+    if (cancelBtn) cancelBtn.style.display = dirty ? '' : 'none';
+    if (activeBtn) activeBtn.disabled = dirty;
+    if (deleteBtn) deleteBtn.style.display = dirty ? 'none' : '';
+    if (applyBtn) applyBtn.disabled = dirty || !ok || state.job?.status === 'running' || !applyIds().length;
+    if (applyHint) applyHint.style.display = dirty ? '' : 'none';
+  };
   const draw = () => page.replaceChildren(...build());
-  // A field's change event fires on blur — i.e. while the user is clicking a button. Redrawing at once
-  // would replace that button before the click lands, so the redraw waits for the click to finish.
-  const redrawLater = () => setTimeout(draw, 0);
   draw();
   const off = subscribe((w) => { if (w === 'results' || w === 'job' || w === 'settings') draw(); });
   return off;
@@ -51,7 +61,7 @@ export function renderChecklists(root, id) {
     const head = h('div', { class: 'page-head' },
       h('div', null, h('h1', null, 'Конструктор чек-листа'), h('div', { class: 'sub' }, 'Критерии, веса, шкалы и условия N/A. Сохранение создаёт новую версию.')),
       h('div', { class: 'head-actions' },
-        dirty ? h('button', { class: 'btn btn-glass', onclick: () => { draft = clone(state.checklists.find((c) => c.id === draft.id) || draft); dirty = false; draw(); } }, 'Отменить') : null,
+        (cancelBtn = h('button', { class: 'btn btn-glass', style: { display: dirty ? '' : 'none' }, onclick: () => { draft = clone(state.checklists.find((c) => c.id === draft.id) || draft); dirty = false; draw(); } }, 'Отменить')),
         (saveBtn = h('button', { class: 'btn btn-primary btn-lg', disabled: !dirty || !valid, onclick: save }, icon('check', 15), 'Сохранить версию'))));
 
     const tabs = h('div', { style: { display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap' } },
@@ -63,13 +73,13 @@ export function renderChecklists(root, id) {
     // ----- left: criteria -----
     const isActive = state.settings?.active?.[draft.channel] === draft.id;
     const meta = h('div', { class: 'cl-meta' },
-      h('input', { class: 'name-input', value: draft.name, oninput: (e) => { draft.name = e.target.value; dirty = true; syncSave(); }, onchange: redrawLater }),
+      h('input', { class: 'name-input', value: draft.name, oninput: (e) => { draft.name = e.target.value; dirty = true; syncDirty(); } }),
       h('select', { class: 'select', onchange: (e) => { draft.channel = e.target.value; markDirty(); } },
         Object.entries(CHANNELS).map(([v, l]) => h('option', { value: v, selected: draft.channel === v ? 'selected' : null }, l))),
       isActive ? h('span', { class: 'tag green tag-lg' }, icon('check', 14), 'Основной')
-        : h('button', { class: 'btn btn-secondary btn-sm', disabled: dirty, onclick: makeActive }, 'Сделать основным'),
+        : (activeBtn = h('button', { class: 'btn btn-secondary btn-sm', disabled: dirty, onclick: makeActive }, 'Сделать основным')),
       h('span', { class: 'tag outline tag-lg' }, `Версия ${draft.version || 1}`),
-      !isActive && !dirty ? h('button', { class: 'icon-btn', title: 'Удалить чек-лист', onclick: remove }, icon('trash', 17)) : null);
+      !isActive ? (deleteBtn = h('button', { class: 'icon-btn', title: 'Удалить чек-лист', style: { display: dirty ? 'none' : '' }, onclick: remove }, icon('trash', 17))) : null);
 
     const rows = h('div', { class: 'crit-rows' }, draft.criteria.map((c, i) => critRow(c, i, markDirty)));
     const left = h('div', { class: 'card', style: { overflow: 'hidden' } }, meta, allocBar(sum, markDirty), rows,
@@ -82,7 +92,7 @@ export function renderChecklists(root, id) {
 
   function critRow(c, i, markDirty) {
     const isOpen = openRows.has(c.id);
-    const set = (k, v) => { c[k] = v; dirty = true; syncSave(); };
+    const set = (k, v) => { c[k] = v; dirty = true; syncDirty(); };
     const typeLabel = c.type === 'scale' ? `Шкала 0–${Math.max(0, ...(c.scale || []).map((s) => +s.value))}` : c.type === 'flag' ? 'Флаг' : 'Да / Нет';
 
     let headEl;
@@ -93,17 +103,22 @@ export function renderChecklists(root, id) {
         const num = h('input', { class: 'input wnum', type: 'number', min: 0, max: 100, value: c.weight });
         const fill = () => range.style.setProperty('--p', `${Math.min(100, (Number(range.value) / 50) * 100)}%`);
         fill();
-        range.addEventListener('input', () => { num.value = range.value; c.weight = +range.value; dirty = true; fill(); refreshSide(); syncSave(); });
-        range.addEventListener('change', draw);
-        num.addEventListener('input', () => { c.weight = Math.max(0, +num.value || 0); range.value = c.weight; dirty = true; fill(); refreshSide(); syncSave(); });
-        num.addEventListener('change', draw);
+        // On blur only settle what is shown (e.g. "-5" typed → 0); no page rebuild, see syncDirty.
+        const settle = () => { num.value = c.weight; range.value = c.weight; fill(); };
+        range.addEventListener('input', () => { num.value = range.value; c.weight = +range.value; dirty = true; fill(); refreshSide(); syncDirty(); });
+        range.addEventListener('change', settle);
+        num.addEventListener('input', () => { c.weight = Math.max(0, +num.value || 0); range.value = c.weight; dirty = true; fill(); refreshSide(); syncDirty(); });
+        num.addEventListener('change', settle);
         const wrap = h('div', { class: 'weight', onclick: (e) => e.stopPropagation() }, range, num);
         return wrap;
       })();
 
+    // Row head pieces that follow the text fields while typing.
+    const codeEl = h('span', { class: 'code' }, c.code || i + 1);
+    const nameText = document.createTextNode(c.name || 'Без названия');
     headEl = h('div', { class: 'crow-head', onclick: () => { isOpen ? openRows.delete(c.id) : openRows.add(c.id); draw(); } },
-      h('span', { class: 'code' }, c.code || i + 1),
-      h('div', { class: 'ttl' }, c.name || 'Без названия',
+      codeEl,
+      h('div', { class: 'ttl' }, nameText,
         h('div', { class: 'tags' },
           h('span', { class: `tag ${c.type === 'flag' ? 'red' : ''}` }, typeLabel),
           c.naAllowed && c.type !== 'flag' ? h('span', { class: 'tag' }, 'N/A') : null)),
@@ -116,10 +131,10 @@ export function renderChecklists(root, id) {
     const listId = `sections-${draft.id}`;
     const body = h('div', { class: 'crow-body' },
       h('div', { class: 'field' }, h('label', null, 'Название'),
-        h('input', { class: 'input', value: c.name, oninput: (e) => set('name', e.target.value), onchange: redrawLater })),
+        h('input', { class: 'input', value: c.name, oninput: (e) => { set('name', e.target.value); nameText.textContent = c.name || 'Без названия'; refreshSide(); } })),
       h('div', { class: 'field-row', style: { gridTemplateColumns: '110px 1fr 1fr' } },
         h('div', { class: 'field' }, h('label', null, 'Номер'),
-          h('input', { class: 'input', value: c.code || '', oninput: (e) => set('code', e.target.value), onchange: redrawLater })),
+          h('input', { class: 'input', value: c.code || '', oninput: (e) => { set('code', e.target.value); codeEl.textContent = c.code || i + 1; refreshSide(); } })),
         h('div', { class: 'field' }, h('label', null, 'Раздел'),
           h('input', { class: 'input', value: c.section || '', list: listId, oninput: (e) => set('section', e.target.value) }),
           h('datalist', { id: listId }, sections.map((s) => h('option', { value: s })))),
@@ -150,18 +165,26 @@ export function renderChecklists(root, id) {
 
   function scaleEditor(c, markDirty) {
     const steps = c.scale || (c.scale = []);
-    return h('div', { class: 'field' }, h('label', null, 'Шкала оценок'),
+    let el;
+    // Steps are kept sorted top-down; after a value is edited only this editor is re-rendered,
+    // so a button the user is clicking elsewhere on the page stays in place.
+    const resort = () => {
+      const before = steps.map((s) => s.value).join();
+      steps.sort((a, b) => b.value - a.value);
+      if (steps.map((s) => s.value).join() !== before) el.replaceWith(el = scaleEditor(c, markDirty));
+    };
+    return (el = h('div', { class: 'field' }, h('label', null, 'Шкала оценок'),
       h('div', { class: 'steps' },
         steps.map((s, i) => h('div', { class: 'step' },
-          h('input', { class: 'input', type: 'number', value: s.value, oninput: (e) => { s.value = Number(e.target.value); dirty = true; syncSave(); }, onchange: () => { steps.sort((a, b) => b.value - a.value); draw(); } }),
-          h('input', { class: 'input', value: s.label || '', placeholder: 'Когда ставить эту оценку', oninput: (e) => { s.label = e.target.value; dirty = true; syncSave(); } }),
+          h('input', { class: 'input', type: 'number', value: s.value, oninput: (e) => { s.value = Number(e.target.value); dirty = true; syncDirty(); }, onchange: resort }),
+          h('input', { class: 'input', value: s.label || '', placeholder: 'Когда ставить эту оценку', oninput: (e) => { s.label = e.target.value; dirty = true; syncDirty(); } }),
           h('button', { class: 'icon-btn', type: 'button', disabled: steps.length <= 2, onclick: () => { steps.splice(i, 1); markDirty(); } }, icon('x', 16))))),
       h('div', null, h('button', { class: 'link-btn', type: 'button', onclick: () => {
         const min = Math.min(...steps.map((s) => s.value), 0);
         steps.push({ value: Math.max(0, min - 1), label: '' });
         steps.sort((a, b) => b.value - a.value);
         markDirty();
-      } }, icon('plus', 15), 'Добавить ступень')));
+      } }, icon('plus', 15), 'Добавить ступень'))));
   }
 
   function changeType(c, type, markDirty) {
@@ -174,13 +197,19 @@ export function renderChecklists(root, id) {
   }
 
   function addCriterion(markDirty) {
-    const codes = draft.criteria.map((c) => parseInt(c.code, 10)).filter((n) => !Number.isNaN(n));
-    const next = String((codes.length ? Math.max(...codes) : 0) + 1).padStart(2, '0');
+    // The first free number: a criterion added in place of a deleted «07» becomes «07» again.
+    const codes = new Set(draft.criteria.map((c) => parseInt(c.code, 10)).filter((n) => !Number.isNaN(n)));
+    let n = 1;
+    while (codes.has(n)) n += 1;
+    const next = String(n).padStart(2, '0');
+    // Likewise the export code: if exactly one of the eight is free, the new criterion takes it.
+    const usedExport = new Set(draft.criteria.map((c) => c.exportId).filter(Boolean));
+    const freeExport = EXPORT_IDS.filter((v) => v !== 'critical' && !usedExport.has(v));
     const weighted = draft.criteria.filter((c) => c.type !== 'flag');
     const c = {
       id: `c${Date.now().toString(36)}`, code: next, name: 'Новый критерий',
       section: weighted[weighted.length - 1]?.section || '', type: 'binary', weight: 0,
-      naAllowed: false, description: '', naRule: '', interpretation: '', exportId: '',
+      naAllowed: false, description: '', naRule: '', interpretation: '', exportId: freeExport.length === 1 ? freeExport[0] : '',
     };
     const flagIdx = draft.criteria.findIndex((x) => x.type === 'flag');
     if (flagIdx >= 0) draft.criteria.splice(flagIdx, 0, c); else draft.criteria.push(c);
@@ -258,7 +287,7 @@ export function renderChecklists(root, id) {
   }
 
   function applyCard(valid) {
-    const ids = state.records.filter((r) => r.channel === draft.channel).map((r) => r.conversation_id);
+    const ids = applyIds();
     const running = state.job?.status === 'running';
     const cmp = comparison();
     return h('div', { class: 'card card-pad' },
@@ -270,11 +299,11 @@ export function renderChecklists(root, id) {
           h('span', { class: 'arr' }, icon('right', 26, 2.5)),
           h('div', { class: 'c' }, h('small', null, `Версия ${draft.version}`), h('b', null, fmtScore(cmp.new)))),
         h('div', { style: { height: '14px' } })) : null,
-      h('button', {
+      (applyBtn = h('button', {
         class: 'btn btn-primary btn-lg btn-block', disabled: dirty || !valid || running || !ids.length,
         onclick: apply,
-      }, icon('sparkles', 18), ids.length ? `Применить к ${ids.length} ${pluralRu(ids.length, 'диалогу', 'диалогам', 'диалогам')}` : 'Нет диалогов этого канала'),
-      dirty ? h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px' } }, 'Сначала сохраните изменения') : null);
+      }, icon('sparkles', 18), ids.length ? `Применить к ${ids.length} ${pluralRu(ids.length, 'диалогу', 'диалогам', 'диалогам')}` : 'Нет диалогов этого канала')),
+      (applyHint = h('div', { style: { color: 'var(--cqa-text-muted)', fontSize: '13px', textAlign: 'center', marginTop: '10px', display: dirty ? '' : 'none' } }, 'Сначала сохраните изменения')));
   }
 
   // Average total for dialogs re-evaluated with the current version vs their previous evaluation.
