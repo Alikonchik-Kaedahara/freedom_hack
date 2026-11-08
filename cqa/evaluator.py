@@ -58,28 +58,31 @@ CALL_NOTE = """Это телефонный звонок. Транскрипт п
 и скрытые данные ([Имя скрыто], [Персональные данные скрыты]) — это не ошибки оператора. Оценивай устную речь: \
 логичность, понятность объяснений, корректность формулировок, паузы и удержание."""
 
-FLOW_NOTE = """Для этого критерия прочитай весь разговор, включая реплики после первого понятного ответа. \
-Для каждого запроса проследи, на что оператор ответил, не сменил ли тему без объяснения, не противоречат ли \
-друг другу его инструкции и пришлось ли клиенту снова задавать тот же вопрос. Отличай такой переспрос от \
-нового вопроса, смены темы самим клиентом и естественного уточнения. Незакрытый вопрос сам по себе относится \
-к полноте консультации (04); для 06 важен ход разговора. Порог первой реакции в оценку не входит.
-В disruptionTurns перечисли номера реплик, которые показывают конкретные сбои в ведении диалога оператором, \
-и включи их в evidence. Если сбоев нет, верни пустой список. Перед выбором ступени сравни её с соседней по шкале. \
-В explanation опиши конкретный запрос, что сказал оператор в ответ и почему это соответствует выбранной ступени. \
-Для 10 обязательно приведи короткую точную цитату оператора в «ёлочках» на исходном языке. В evidence укажи \
-связанные реплики клиента и оператора. Не приписывай клиенту понимание, если он этого не показал. \
-Если была только передача оператору и приветствие, опиши это ограничение и поставь низкую уверенность.
-Примеры различий: клиент уточнил, на каком экране искать отчёт, получил понятный путь и нашёл его — возможны 10. \
-Один сбой, затем оператор сам исправил инструкцию и клиент может продолжить — 7. Оператор ответил про тариф \
-на вопрос об отчёте, и клиенту пришлось повторить исходный вопрос — 4. Оператор даёт взаимоисключающие \
-указания и к концу разговора непонятно, что делать — 0.
-Проверяй связь и порядок реплик. Ошибка безопасности или неполный ответ сами по себе \
-не определяют эту ступень. Для снижения укажи наблюдаемый сбой именно в ведении разговора. Отличай 4 от 0: \
-при 4 можно проследить разговор и увидеть, почему клиенту пришлось переспросить; при 0 последовательность \
-указаний невозможно восстановить из-за бессвязности или противоречий. Нерешённый запрос сам по себе не означает 0. \
-Для 4 процитируй в «ёлочках» реплику клиента из disruptionTurns: что именно пришлось повторить из-за формулировок \
-или порядка ответов? Фразы «этот вопрос ещё не решён», отказ платить и проверка того, правильно ли клиент понял \
-ответ, сами по себе такого переспроса не доказывают."""
+FLOW_SCORES = {
+    "clear": 10, "clear_but_unresolved": 10, "recoverable_lapse": 7,
+    "client_had_to_repair": 4, "sequence_unintelligible": 0,
+}
+FLOW_EVENTS = [*FLOW_SCORES, "too_little_exchange"]
+EMPATHY_RESPONSES = ["civil", "addresses_concern", "rude_or_dismissive", "uncertain"]
+
+FLOW_NOTE = """Сначала проследи самый серьёзный наблюдаемый сбой в репликах оператора. В flowEvent выбери его тип:
+clear — клиенту понятны ответы, включая новую тему, уточнение детали или сверку понимания (10).
+clear_but_unresolved — понятно, что оператор может сделать, чего не может или о чём ещё нет сведений. Клиент \
+может вновь просить об исключении, ждать результата или напоминать про оставшуюся часть задачи, понимая \
+сказанное. Если других сбоев в ведении не было, это также 10. Полноту помощи отдельно оценит критерий 04.
+recoverable_lapse — одна реально наблюдаемая оговорка, сбой порядка или ожидание без предупреждения; \
+клиент может продолжить, ему не пришлось заново формулировать вопрос из-за сбоя (7).
+client_had_to_repair — оператор ответил мимо темы, указал шаги неясно или в неверном порядке И клиенту \
+пришлось из-за этого повторить запрос или спросить, что оператор имел в виду (4). Даже если следующим \
+ответом оператор всё исправил, переспрос уже понадобился. Сравни это с просьбой всё же решить понятную проблему.
+sequence_unintelligible — взаимоисключающие или бессвязные указания не позволяют восстановить ход действий (0).
+too_little_exchange — например, есть только приветствие; выбери допустимую ступень с low и объясни ограничение.
+Для каждого снижения укажи: какой вопрос был задан, какие слова оператора нарушили ход разговора, как это \
+проявилось. Невежливость, нарушение идентификации и отсутствие желаемого результата оцениваются по своим правилам. \
+Оцени 06 по связи и порядку реплик; порог первой реакции в оценку не входит. В disruptionTurns включи номера \
+сбоев из evidence либо [] при ясном ведении. При 4 нужна точная цитата переспроса клиента в «ёлочках» из \
+disruptionTurns. При 10 нужны связанная реплика клиента (если она есть) и точная цитата оператора в «ёлочках» \
+из evidence. Цитируй на исходном языке и не додумывай реакцию клиента."""
 
 
 CONSULTATION_NOTE = """Выдели вопросы, которые клиент действительно задал, и проверь ответ или следующий шаг по каждому. \
@@ -96,9 +99,19 @@ DISCOVERY_NOTE = """Сначала установи, какого конкрет
 не изложив вопрос, примени условие N/A. Даже когда последующий ответ оператора был плохим, для «Нет» здесь \
 нужно назвать действительно недостающую деталь, необходимую для ответа, или ненужный повтор уже известного."""
 
-EMPATHY_NOTE = """Уточнение клиента и указание на пропущенную часть вопроса могут быть нейтральными. Если \
-клиент выразил неудобство, поясни, что именно он сказал и как оператор на это отреагировал. Формальное отсутствие \
-извинения само по себе не определяет оценку. Невежливость самого оператора тоже учитывается."""
+EMPATHY_NOTE = """Установи, о каком неудобстве, тревоге, недовольстве или последствиях прямо сообщил клиент \
+и была ли у оператора возможность отреагировать. В concernTurns укажи номера этих реплик клиента из evidence. \
+Нейтральное «дата неизвестна», «вторая часть осталась открытой», несогласие с правилом или уточняющий вопрос \
+сами по себе не свидетельствуют о такой эмоции; тогда concernTurns может быть [].
+В empathyResponse выбери наблюдаемое поведение оператора. civil — говорил уважительно; конкретной реакции на \
+выраженное неудобство не было. При пустом concernTurns это Да, при проигнорированном конкретном неудобстве — Нет. \
+addresses_concern — признал названную проблему или предложил действие именно для облегчения её последствий (Да). \
+Для этого не обязательно извиняться, обещать невозможное или решить весь запрос. За одну формулу вежливости или \
+сочувствие бота заслугу оператору не приписывай. rude_or_dismissive — сам нагрубил или явно отмахнулся (Нет, \
+даже если дал ясный ответ). uncertain — по репликам не установить, что произошло; используй low и объясни почему.
+В объяснении сошлись на фактическое высказывание клиента и поступок или слова оператора. Нейтральный \
+деловой тон можно оценить на Да и при нерешённой задаче. Оценивай тон и реакцию, а не полноту консультации."""
+
 
 CLOSURE_NOTE = """Прочитай последнюю реплику оператора целиком и предыдущие завершающие реплики. Отдельно \
 проверь наличие итога или предложения помощи и наличие прощания. Перечисление того, что успели сделать, — \
@@ -215,23 +228,27 @@ def is_consultation(c):
 def build_schema(checklist, with_knowledge=False):
     props = {}
     for c in checklist["criteria"]:
-        fields = {
+        rule = _builtin_rule(c)
+        fields = {}
+        turns = {"type": "array", "items": {"type": "integer"}}
+        if rule == "dialogue":
+            fields["flowEvent"] = {"type": "string", "enum": FLOW_EVENTS}
+            fields["disruptionTurns"] = turns
+        elif rule == "empathy":
+            fields["concernTurns"] = turns
+            fields["empathyResponse"] = {"type": "string", "enum": EMPATHY_RESPONSES}
+        fields.update({
             "evidence": {"type": "array", "items": {"type": "integer"}},
             "explanation": {"type": "string"},
             "verdict": {"type": "string", "enum": _verdicts(c)},
             "confidence": {"type": "string", "enum": CONFIDENCE},
-        }
-        required = ["evidence", "explanation", "verdict", "confidence"]
-        if _builtin_rule(c) == "dialogue":
-            fields["disruptionTurns"] = {"type": "array", "items": {"type": "integer"}}
-            required.append("disruptionTurns")
+        })
         if with_knowledge and is_consultation(c):
             fields["contradicts"] = {"type": "array", "items": {"type": "string"}}
-            required.append("contradicts")
         props[c["id"]] = {
             "type": "object",
             "properties": fields,
-            "required": required,
+            "required": list(fields),
             "additionalProperties": False,
         }
     return {
@@ -273,6 +290,16 @@ def _quotes_speaker(explanation, transcript, indices, speaker):
 
 def _flow_issues(answer, disruptions, transcript):
     evidence = answer["evidence"]
+    # A saved assessment from before flowEvent can still be replayed with its original checks.
+    if "flowEvent" in answer:
+        event = answer["flowEvent"]
+        if event not in FLOW_EVENTS:
+            yield "Выбери наблюдаемый тип события для ведения диалога."
+        elif event == "too_little_exchange":
+            if answer["confidence"] != "low":
+                yield "Если разговора недостаточно, укажи низкую уверенность и объясни, чего не видно."
+        elif answer["answer"] != FLOW_SCORES[event]:
+            yield f"Выбранное событие соответствует ступени {FLOW_SCORES[event]}. Проверь причину и вердикт по репликам."
     if not isinstance(disruptions, list) or any(type(i) is not int or i not in evidence for i in disruptions):
         yield "Укажи номера реплик со сбоем среди доказательств. Если сбоев нет, верни пустой список."
         return
@@ -289,6 +316,30 @@ def _flow_issues(answer, disruptions, transcript):
         yield "Для максимума укажи также реплику клиента, с которой связан ответ оператора."
     if not _quotes_speaker(answer["explanation"], transcript, evidence, "operator"):
         yield "Для максимума объясни связь вопроса и ответа и приведи точную цитату «…» из отмеченной реплики оператора."
+
+
+def _empathy_issues(answer, transcript):
+    cues, response = answer["concernTurns"], answer["empathyResponse"]
+    evidence = answer["evidence"]
+    client_evidence = {i for i in evidence if transcript[i].get("speaker") == "client"}
+    if not isinstance(cues, list) or any(type(i) is not int or i not in client_evidence for i in cues):
+        yield "Укажи в concernTurns только отмеченные реплики клиента с конкретным неудобством, либо пустой список."
+        return
+    if response not in EMPATHY_RESPONSES:
+        yield "Уточни, как оператор отреагировал на клиента."
+        return
+    if response == "uncertain":
+        if answer["confidence"] != "low":
+            yield "Укажи низкую уверенность, если реакцию оператора нельзя определить."
+        return
+    if not any(transcript[i].get("speaker") == "operator" for i in evidence):
+        yield "Для оценки тона или реакции укажи слова самого оператора в evidence."
+    if response == "addresses_concern" and not cues:
+        yield "Какая реплика клиента показывает конкретное неудобство, на которое отреагировал оператор?"
+    positive = response == "addresses_concern" or (response == "civil" and not cues)
+    expected = "yes" if positive else "no"
+    if answer["answer"] != expected:
+        yield f"При отмеченных репликах и типе реакции ожидается {expected}. Сверь тон, реакцию и вердикт."
 
 
 def validate(raw, checklist, record, known_facts=None, *, replayed=False):
@@ -368,11 +419,18 @@ def validate(raw, checklist, record, known_facts=None, *, replayed=False):
         answers[c["id"]] = {
             "answer": answer, "explanation": explanation, "evidence": evidence, "confidence": confidence,
         }
-        if _builtin_rule(c) == "dialogue" and (not replayed or "disruptionTurns" in item):
+        rule = _builtin_rule(c)
+        if rule == "dialogue" and (not replayed or "disruptionTurns" in item or "flowEvent" in item):
             disruptions = item.get("disruptionTurns")
             answers[c["id"]]["disruptionTurns"] = disruptions
+            if not replayed or "flowEvent" in item:
+                answers[c["id"]]["flowEvent"] = item.get("flowEvent")
             for issue in _flow_issues(answers[c["id"]], disruptions, transcript):
                 problem(c, "flow_evidence", f"Критерий {label}: {issue}")
+        if rule == "empathy" and (not replayed or "concernTurns" in item or "empathyResponse" in item):
+            answers[c["id"]].update(concernTurns=item.get("concernTurns"), empathyResponse=item.get("empathyResponse"))
+            for issue in _empathy_issues(answers[c["id"]], transcript):
+                problem(c, "empathy_evidence", f"Критерий {label}: {issue}")
         if is_consultation(c) and isinstance(item.get("contradicts"), list):
             ids = [str(x) for x in item["contradicts"] if isinstance(x, (str, int))]
             if known_facts is not None:

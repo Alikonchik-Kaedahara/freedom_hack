@@ -45,8 +45,9 @@ def _to_raw(answers):
             "explanation": a.get("explanation") or "",
             "confidence": a.get("confidence") or "medium",
         }
-        if "disruptionTurns" in a:
-            raw[cid]["disruptionTurns"] = a["disruptionTurns"]
+        for field in ("disruptionTurns", "flowEvent", "concernTurns", "empathyResponse"):
+            if field in a:
+                raw[cid][field] = a[field]
     return raw
 
 

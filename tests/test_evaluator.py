@@ -35,7 +35,8 @@ def good_raw(checklist=CHAT):
             verdict = "yes"
         raw[c["id"]] = {"verdict": verdict, "evidence": [2, 4], "explanation": "ok", "confidence": "high"}
     raw["c3"] = {"verdict": "na", "evidence": [1], "explanation": "общий вопрос", "confidence": "high"}
-    raw["c6"].update(evidence=[1, 2, 4], disruptionTurns=[],
+    raw["c5"].update(concernTurns=[], empathyResponse="civil")
+    raw["c6"].update(evidence=[1, 2, 4], disruptionTurns=[], flowEvent="clear",
                      explanation="На вопрос о комиссии оператор попросил «Уточните тариф, пожалуйста.» и сообщил ставку.")
     raw["c8"]["evidence"] = []
     return raw
@@ -120,7 +121,7 @@ def test_flow_maximum_requires_grounded_operator_quote_and_client_context(langua
     rec = {**RECORD, "language": language, "transcript": [
         {"speaker": "client", "text": question}, {"speaker": "operator", "text": reply}]}
     cl = {"criteria": [CHAT["criteria"][5]]}
-    row = dict(verdict="10", confidence="high", evidence=[0, 1], disruptionTurns=[],
+    row = dict(verdict="10", confidence="high", evidence=[0, 1], disruptionTurns=[], flowEvent="clear",
                explanation=f"На вопрос об отчёте оператор дал путь: «{reply}».")
     assert not evaluator.validate({"c6": row}, cl, rec)[1]
     for change in [dict(explanation="Ясно и связно."), dict(explanation=f"Оператор сказал «{question}»."),
@@ -138,7 +139,7 @@ def test_incoherent_exchange_retries_instead_of_accepting_generic_ten(monkeypatc
     ]}
     cl = {"criteria": [CHAT["criteria"][5]]}
     wrong = dict(verdict="10", confidence="high", evidence=[1], disruptionTurns=[], explanation="Ясно и связно.")
-    fixed = dict(verdict="4", confidence="high", evidence=[0, 1, 2, 3], disruptionTurns=[1, 2],
+    fixed = dict(verdict="4", confidence="high", evidence=[0, 1, 2, 3], disruptionTurns=[1, 2], flowEvent="client_had_to_repair",
                  explanation="В ответ на вопрос об отчёте оператор предложил отключить уведомления. Клиент повторил вопрос: «Где его найти?».")
     calls = []
 
@@ -172,6 +173,7 @@ def test_flow_guidance_follows_the_official_rule_not_the_position():
 def test_legacy_replay_keeps_its_original_verdict():
     raw = good_raw()
     raw["c6"].pop("disruptionTurns")
+    raw["c6"].pop("flowEvent")
     raw["c6"]["explanation"] = "Ответы ясные и связные."
     answers, problems = evaluator.validate(raw, CHAT, RECORD, replayed=True)
     assert not problems and answers["c6"]["answer"] == 10
@@ -185,13 +187,57 @@ def test_four_requires_the_clients_actual_request_in_the_cited_disruption():
         {"speaker": "operator", "text": "Включите уведомления."},
         {"speaker": "client", "text": "Я про форму. Где её скачать?"},
     ]}
-    item = dict(verdict="4", confidence="high", evidence=[0, 1, 2], disruptionTurns=[1, 2],
+    item = dict(verdict="4", confidence="high", evidence=[0, 1, 2], disruptionTurns=[1, 2], flowEvent="client_had_to_repair",
                 explanation="Клиенту пришлось переспросить: «Где именно нажать?»")
     assert evaluator.validate({"c6": item}, cl, record)[1]
     item["explanation"] = "Клиент снова спрашивает: «Где её скачать?»"
     assert not evaluator.validate({"c6": item}, cl, record)[1]
     item["disruptionTurns"] = [1]
     assert evaluator.validate({"c6": item}, cl, record)[1]
+
+
+def test_understood_but_unresolved_and_a_client_repair_are_different_flow_events():
+    cl = {"criteria": [CHAT["criteria"][5]]}
+    record = {"transcript": [
+        {"speaker": "client", "text": "Документ готов?"},
+        {"speaker": "operator", "text": "Документ ещё на согласовании."},
+        {"speaker": "client", "text": "Понял, документ мне всё ещё нужен."},
+    ]}
+    item = dict(verdict="10", flowEvent="clear_but_unresolved", confidence="high", evidence=[0, 1, 2],
+                disruptionTurns=[], explanation="Оператор объяснил статус: «Документ ещё на согласовании».")
+    assert not evaluator.validate({"c6": item}, cl, record)[1]
+    for verdict in ("7", "4"):
+        assert evaluator.validate({"c6": {**item, "verdict": verdict}}, cl, record)[1]
+    assert evaluator.validate({"c6": {**item, "flowEvent": "client_had_to_repair"}}, cl, record)[1]
+
+
+@pytest.mark.parametrize("response,cues,verdict,ok", [
+    ("civil", [], "yes", True), ("civil", [], "no", False),
+    ("civil", [1], "no", True), ("civil", [1], "yes", False),
+    ("addresses_concern", [1], "yes", True), ("addresses_concern", [], "yes", False),
+    ("rude_or_dismissive", [], "no", True), ("rude_or_dismissive", [], "yes", False),
+    ("civil", [2], "no", False), ("civil", [99], "no", False),
+])
+def test_empathy_checks_the_actor_and_matches_the_verdict_to_the_observation(response, cues, verdict, ok):
+    cl = {"criteria": [CHAT["criteria"][4]]}
+    item = dict(verdict=verdict, confidence="high", evidence=[1, 2], concernTurns=cues,
+                empathyResponse=response, explanation="Описание наблюдаемой реакции.")
+    _, problems = evaluator.validate({"c5": item}, cl, RECORD)
+    assert (not problems) == ok
+
+
+def test_preserve_replay_across_observation_schema_versions():
+    raw = good_raw()
+    current, problems = evaluator.validate(raw, CHAT, RECORD)
+    assert not problems
+    assert not evaluator.validate(replay._to_raw(current), CHAT, RECORD, replayed=True)[1]
+    for key in ("empathyResponse", "concernTurns"):
+        del raw["c5"][key]
+    del raw["c6"]["flowEvent"]  # previous schema still had disruptionTurns
+    _, problems = evaluator.validate(raw, CHAT, RECORD, replayed=True)
+    assert not problems
+    _, problems = evaluator.validate(raw, CHAT, RECORD)
+    assert {p["criterionId"] for p in problems} == {"c5", "c6"}
 
 
 def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edits():
@@ -203,6 +249,8 @@ def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edi
         assert evaluator.FLOW_NOTE in evaluator.render_checklist(edited)
         edited["criteria"][1]["naRule"] = "Другое условие неприменимости."
         assert evaluator.DISCOVERY_NOTE not in evaluator.render_checklist(edited)
+        edited["criteria"][4]["description"] = "Оцените другой навык."
+        assert "concernTurns" not in evaluator.build_schema(edited)["properties"]["c5"]["properties"]
 
 
 def test_cloud_client_accepts_a_key_from_settings(monkeypatch):

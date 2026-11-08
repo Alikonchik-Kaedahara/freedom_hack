@@ -322,7 +322,11 @@ def fake_cloud(monkeypatch, flip=None):
         cid = messages[0]["content"].split("Диалог ")[1].split(" ")[0]
         checklist_id = "call-base" if "voice call" in messages[0]["content"].split("\n")[0] else "chat-base"
         raw = copy.deepcopy(answers[cid][checklist_id])
+        empathy = raw["c5"]
+        empathy["concernTurns"] = []
+        empathy["empathyResponse"] = "civil" if empathy["verdict"] == "yes" else "uncertain"
         flow = raw["c6"]
+        flow["flowEvent"] = {"10": "clear", "7": "recoverable_lapse", "4": "client_had_to_repair", "0": "sequence_unintelligible"}[flow["verdict"]]
         if flow["verdict"] == "10":
             turns = transcripts[cid]
             client = next(i for i, t in enumerate(turns) if t["speaker"] == "client")
