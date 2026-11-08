@@ -741,7 +741,8 @@ def calibration_files():
     who = request.args.get("who")
     if who is None:
         return jsonify({"group": group, "authors": sorted(r["document"]["who"] for r in reviewers.values()),
-                        "updatedAt": record.get("updatedAt", saved.get("updatedAt"))})
+                        "updatedAt": record.get("updatedAt", saved.get("updatedAt")),
+                        "availableGroups": quality.marked_groups(saved)})
     saved = reviewers.get(who.strip().casefold())
     return jsonify(saved["document"]) if saved else bad("Разметка этого автора не найдена", 404)
 

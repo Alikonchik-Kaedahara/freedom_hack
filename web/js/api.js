@@ -70,8 +70,10 @@ export const api = {
     if (operator != null) params.set('operator', operator);
     return req('GET', `/api/quality?${params}`);
   },
-  uploadCalibration: (file) => upload('/api/quality/calibration', file),
-  clearCalibration: () => req('DELETE', '/api/quality/calibration'),
+  uploadCalibration: (group, file) => upload(`/api/quality/calibration?group=${e(group)}`, file),
+  clearCalibration: (group) => req('DELETE', `/api/quality/calibration?group=${e(group)}`),
+  calibrationInfo: (group) => req('GET', `/api/quality/calibration?group=${e(group)}`),
+  annotationUrl: (group, who) => `${BASE}/api/quality/calibration?group=${e(group)}&who=${e(who)}`,
   operators: (g) => req('GET', `/api/operators?group=${e(g)}`),
   setOperator: (key, name) => req('PUT', `/api/results/${e(key)}/operator`, { name }),
   knowledge: (g) => req('GET', `/api/knowledge${g ? `?group=${e(g)}` : ''}`),

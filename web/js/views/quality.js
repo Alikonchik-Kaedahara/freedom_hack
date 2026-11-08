@@ -76,32 +76,61 @@ export function renderVerification(root) {
 
   // ----- 1. agreement with people -----
   function peopleCard(c) {
-    const file = h('input', { type: 'file', accept: '.xlsx,.json', hidden: true });
-    const send = async (f) => {
-      if (!f) return;
-      try {
-        const r = await api.uploadCalibration(f);
-        toast(`Разметка загружена: ${n(r.entries, 'ответ', 'ответа', 'ответов')}`);
-        await load();
-      } catch (e) { toast(e.message, { type: 'error' }); } finally { file.value = ''; }
+    const group = data.group;
+    const file = h('input', { type: 'file', accept: '.xlsx,.json', multiple: true, hidden: true });
+    const send = async (files) => {
+      const selected = Array.from(files || []);
+      if (!selected.length) return;
+      for (const f of selected) {
+        try {
+          const r = await api.uploadCalibration(group, f);
+          toast(`${r.who || f.name} · сохранено ${n(r.entries, 'ответ', 'ответа', 'ответов')}`);
+        } catch (err) { toast(`${f.name} · ${err.message}`, { type: 'error' }); }
+      }
+      file.value = '';
+      await load();
     };
-    file.addEventListener('change', () => send(file.files?.[0]));
+    file.addEventListener('change', () => send(file.files));
     const template = h('a', { class: 'link-btn', href: 'assets/calibration-template.xlsx', download: 'Калибровка_CQA.xlsx' }, 'Скачать шаблон таблицы');
-    const drop = h('div', { class: 'drop-zone', role: 'button', tabindex: 0, onclick: () => file.click(), onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } } },
+    const drop = h('div', { class: 'drop-zone', role: 'button', tabindex: 0,
+      onclick: (e) => { if (e.target !== file) file.click(); },
+      onkeydown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); file.click(); } } },
       icon('upload', 18),
-      h('div', null, h('b', null, c.entries ? 'Загрузить другую разметку' : 'Загрузить заполненную таблицу'),
-        h('div', { class: 'muted' }, 'Excel с листом «Разметка» — перетащите сюда или нажмите')),
+      h('div', null, h('b', null, 'Загрузить разметку'),
+        h('div', { class: 'muted' }, 'Файлы JSON от разметчиков или Excel с итоговыми оценками')),
       file);
     drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
     drop.addEventListener('dragleave', () => drop.classList.remove('over'));
-    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); send(e.dataTransfer?.files?.[0]); });
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); send(e.dataTransfer?.files); });
 
-    if (!c.entries) {
+    const otherGroups = (c.availableGroups || []).filter((g) => g !== group);
+    const otherLinks = otherGroups.map((g) => {
+      const url = new URL(location.href);
+      const params = new URLSearchParams(url.searchParams.get('data') || '');
+      params.set('groupId', g);
+      params.delete('conversationId');
+      url.searchParams.set('data', params.toString());
+      url.hash = '/settings/verification';
+      return h('a', { class: 'link-btn', href: url.toString() }, `Открыть разметку ${g}`);
+    });
+    if (!c.entries && !c.team) {
       return card('Совпадает ли с оценкой людей?', null, null, [
-        'Пока неизвестно: ручной разметки ещё нет.',
-        'Как проверить: двое-трое проверяющих независимо оценивают 10–12 диалогов по тому же чек-листу, сводят общий ответ по каждому критерию и загружают таблицу. Система сравнит их ответы со своими.',
-      ], null, [drop, template]);
+        `Для набора ${group} разметка ещё не загружена.`,
+      ], otherLinks, [drop, template]);
     }
+    const team = c.team;
+    const votes = (title, rows) => !rows.length ? null : h('details', { class: 'q-more' },
+      h('summary', null, `${title} · ${rows.length}`),
+      h('ul', { class: 'q-list' }, rows.map((row) => h('li', null, dialogLink(row.conversationId),
+        ` · критерий ${row.criterionCode} · `,
+        Object.entries(row.votes).map(([who, value]) => `${who}: ${VALUE(value)}`).join(' · ')))));
+    const people = team && h('section', { class: 'q-list', 'aria-label': 'Разметка команды' },
+      h('b', null, `Разметка команды · ${n(team.total, 'ответ', 'ответа', 'ответов')}`),
+      team.authors.map((a) => h('a', { class: 'link-btn', href: api.annotationUrl(group, a.name),
+        download: `razmetka_${a.name}.json`, title: `Скачать разметку · ${a.name}` },
+        a.name, ` · ${n(a.entries, 'ответ', 'ответа', 'ответов')} · ${n(a.dialogs, 'диалог', 'диалога', 'диалогов')}`)),
+      votes('Разметчики поставили разные оценки', team.conflicts),
+      votes('Неполная разметка', team.partial));
     const dialogs = new Set(c.rows.map((r) => r.conversationId)).size;
     const mism = c.compared - c.agree;
     const problem = c.perCriterion.filter((p) => p.disagreements.length).sort((a, b) => b.disagreements.length - a.disagreements.length);
@@ -112,15 +141,18 @@ export function renderVerification(root) {
         h('ul', null, p.disagreements.map((d) => h('li', null,
           dialogLink(d.conversationId), `: проверяющие — ${VALUE(d.human)}, система — ${VALUE(d.model)}`,
           d.comment ? h('span', { class: 'muted' }, ` · ${d.comment}`) : null))))))) : null;
-    const worst = problem[0];
     return card('Совпадает ли с оценкой людей?', c.rate, verdictWord(c.rate), [
-      `Проверяющие вручную оценили ${n(dialogs, 'диалог', 'диалога', 'диалогов')} — это ${n(c.compared, 'ответ', 'ответа', 'ответов')} по критериям. Система ответила так же в ${c.agree} из них.`,
-      c.near ? `Ещё ${n(c.near, 'ответ отличается', 'ответа отличаются', 'ответов отличаются')} на одну ступень шкалы (например, 15 вместо 20) — это считается расхождением.` : null,
-      c.perLanguage.length > 1 ? `По языкам: ${c.perLanguage.map((l) => `${langName(l.language)} ${pct(l.rate)}`).join(', ')}.` : null,
-      worst && worst.disagreements.length >= 2 ? `Чаще всего расходится критерий ${worst.code} «${worst.name}» — значит, его правило люди и система читают по-разному: уточните формулировку в чек-листе.` : null,
-      c.missing.length ? `В разметке есть диалоги, которые система ещё не оценила: ${c.missing.join(', ')}.` : null,
-    ], details, [drop, h('span', { class: 'muted small' }, `Разметка загружена ${fmtDate(c.updatedAt)}`), template,
-      h('button', { class: 'link-btn', type: 'button', onclick: async () => { await api.clearCalibration(); await load(); } }, 'Удалить разметку')]);
+      c.compared ? `Модель совпала с ручной оценкой в ${c.agree} из ${c.compared} случаев по ${n(dialogs, 'диалогу', 'диалогам', 'диалогам')}.` : 'Для сравнения пока нет общих оценок.',
+      team && !team.decisions ? `В сравнении участвуют ответы, одинаковые у всех загрузивших разметку (минимум двое).` : null,
+      team?.decisions ? 'Для согласованных вручную строк используется итог команды.' : null,
+      c.near ? `Ещё ${n(c.near, 'ответ отличается', 'ответа отличаются', 'ответов отличаются')} на одну ступень шкалы.` : null,
+      c.perLanguage.length > 1 ? c.perLanguage.map((l) => `${langName(l.language)} · ${pct(l.rate)}`).join(' / ') : null,
+      c.missing.length ? `Для сравнения ещё нужно оценить ${c.missing.join(', ')}.` : null,
+    ], [people, details, otherLinks], [drop, h('span', { class: 'muted small' }, `Сохранено на сервере · ${fmtDate(c.updatedAt)}`), template,
+      h('button', { class: 'link-btn', type: 'button', onclick: async () => {
+        if (!window.confirm(`Удалить все файлы разметки набора ${group} для всей команды?`)) return;
+        try { await api.clearCalibration(group); await load(); } catch (err) { toast(err.message, { type: 'error' }); }
+      } }, 'Удалить разметку набора')]);
   }
 
   // ----- 2. repeatability -----
@@ -163,9 +195,23 @@ export function renderVerification(root) {
     return out;
   }
 
+  let active = true;
+  let checking = false;
+  const checkUpdates = async () => {
+    if (!active || loading || checking || document.hidden || !data) return;
+    checking = true;
+    try {
+      const latest = await api.calibrationInfo(data.group);
+      if (active && (latest.updatedAt !== data.calibration.updatedAt
+        || (latest.availableGroups || []).join('|') !== (data.calibration.availableGroups || []).join('|'))) await load();
+    } catch { /* Keep the last reading until the server is reachable again. */ }
+    finally { checking = false; }
+  };
   load();
+  const timer = setInterval(checkUpdates, 15000);
+  document.addEventListener('visibilitychange', checkUpdates);
   const off = subscribe((w) => { if (w === 'results' || (w === 'job' && !state.job)) load(); else if (w === 'job') draw(); });
-  return () => { sequence++; off(); };
+  return () => { active = false; sequence++; off(); clearInterval(timer); document.removeEventListener('visibilitychange', checkUpdates); };
 }
 
 function verdictWord(rate) {

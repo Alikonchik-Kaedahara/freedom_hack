@@ -92,7 +92,10 @@ def save_calibration(entries, updated_at, source="", *, group=None, submission=N
     if not clean:
         raise ValueError("В файле нет заполненных оценок.")
     doc = {"entries": list(clean.values()), "updatedAt": updated_at, "source": source}
-    who = str((submission or {}).get("who") or "").strip()
+    who = (submission or {}).get("who", "")
+    if submission is not None and "who" in submission and (not isinstance(who, str) or not who.strip()):
+        raise ValueError("В индивидуальной разметке нужно имя автора в поле who.")
+    who = who.strip()
 
     def merge(root):
         if group is None:  # previously stored unscoped consensus
@@ -121,10 +124,15 @@ def clear_calibration(group, updated_at):
     }))
 
 
+def marked_groups(saved):
+    return sorted(g for g, d in saved.get("groups", {}).items()
+                  if d.get("reviewers") or d.get("consensus", {}).get("entries"))
+
+
 def group_calibration(group, records):
     saved = get_calibration()
     groups = saved.get("groups", {})
-    available = sorted(g for g, d in groups.items() if d.get("reviewers") or d.get("consensus", {}).get("entries"))
+    available = marked_groups(saved)
     record = groups.get(group, {})
     ids = {r["conversation_id"] for r in records}
     consensus = record.get("consensus") or {
