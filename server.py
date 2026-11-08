@@ -17,6 +17,7 @@ import sys
 import threading
 import time
 import uuid
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
@@ -704,31 +705,54 @@ def quality_overview():
 
 @app.post("/api/quality/calibration")
 def upload_calibration():
-    """The team's manual markup: Калибровка_CQA.xlsx (sheet «Разметка») or JSON {entries: [...]}."""
+    """Import an individual JSON export or the team's consensus as JSON/XLSX."""
     try:
         if "file" in request.files:
             f = request.files["file"]
             data = f.read()
-            name = (f.filename or "").lower()
-            entries = quality.parse_xlsx(data) if name.endswith(".xlsx") else quality.parse_json(data)
             source = f.filename or "upload"
+            if source.lower().endswith(".xlsx"):
+                submission = {"entries": quality.parse_xlsx(data)}
+            else:
+                submission = quality.parse_json(data)
         else:
-            body = body_json()
-            if body is None or not isinstance(body.get("entries"), list):
-                return bad("Ожидается файл .xlsx/.json или JSON с полем entries")
-            entries, source = body["entries"], "api"
-    except (ValueError, KeyError) as e:
+            submission, source = body_json(), "api"
+        if not isinstance(submission, dict) or not isinstance(submission.get("entries"), list):
+            return bad("Ожидается файл .xlsx/.json или JSON с полем entries")
+        entries = submission["entries"]
+        group = quality.calibration_group(entries, request.args.get("group"))
+        doc = quality.save_calibration(entries, now(), source, group=group, submission=submission)
+    except (ValueError, KeyError, TypeError) as e:
         return bad(f"Не удалось прочитать разметку: {e}")
-    except Exception as e:  # malformed workbook
+    except (OSError, EOFError, zipfile.BadZipFile) as e:
         return bad(f"Не удалось прочитать файл: {e}")
-    doc = quality.save_calibration(entries, now(), source)
-    return jsonify({"entries": len(doc["entries"]), "updatedAt": doc["updatedAt"], "source": doc["source"]})
+    return jsonify({"entries": len(doc["entries"]), "updatedAt": doc["updatedAt"],
+                    "source": source, "who": submission.get("who"), "group": group})
+
+
+@app.get("/api/quality/calibration")
+def calibration_files():
+    group = request.args.get("group")
+    if not group:
+        return bad("Укажите набор: ?group=DEV")
+    saved = quality.get_calibration()
+    record = saved.get("groups", {}).get(group, {})
+    reviewers = record.get("reviewers", {})
+    who = request.args.get("who")
+    if who is None:
+        return jsonify({"group": group, "authors": sorted(r["document"]["who"] for r in reviewers.values()),
+                        "updatedAt": record.get("updatedAt", saved.get("updatedAt"))})
+    saved = reviewers.get(who.strip().casefold())
+    return jsonify(saved["document"]) if saved else bad("Разметка этого автора не найдена", 404)
 
 
 @app.delete("/api/quality/calibration")
 def clear_calibration():
-    quality.save_calibration([], now(), "")
-    return jsonify({"ok": True})
+    group = request.args.get("group") or storage.get_settings().get("activeGroup")
+    if not group:
+        return bad("Укажите набор разметки.")
+    quality.clear_calibration(group, now())
+    return jsonify({"ok": True, "group": group})
 
 
 # ---------- operators ----------

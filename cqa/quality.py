@@ -48,20 +48,122 @@ def get_calibration():
     return storage._read("calibration", {"entries": [], "updatedAt": None})
 
 
-def save_calibration(entries, updated_at, source=""):
-    """entries: [{conversationId, criterionCode, value, evidence?, comment?}] — the team's consensus."""
-    clean = []
-    for e in entries:
-        cid = str(e.get("conversationId") or "").strip()
-        code = str(e.get("criterionCode") or "").strip()
-        value = norm_value(e.get("value"))
-        if not cid or not code or value is None:
+def _pair(entry):
+    return (str(entry["conversationId"]).strip(), str(entry["criterionCode"]).strip())
+
+
+def _clean_entries(entries):
+    clean = {}
+    for row in entries:
+        if not isinstance(row, dict) or not row.get("conversationId") or not row.get("criterionCode"):
+            raise ValueError("В каждой строке нужны conversationId и criterionCode.")
+        cid, code = _pair(row)
+        value = norm_value(row.get("value"))
+        if value is None:
             continue
-        clean.append({"conversationId": cid, "criterionCode": code, "value": value,
-                      "evidence": e.get("evidence"), "comment": str(e.get("comment") or "").strip()})
-    doc = {"entries": clean, "updatedAt": updated_at, "source": source}
-    storage._write("calibration", doc)
-    return doc
+        if not isinstance(value, (int, float)) and value not in ("yes", "no", "na"):
+            raise ValueError(f"Неизвестная оценка «{value}» для {cid}, критерий {code}.")
+        if (cid, code) in clean:
+            raise ValueError(f"Повторяется строка {cid}, критерий {code}.")
+        clean[cid, code] = {"conversationId": cid, "criterionCode": code, "value": value,
+                            "evidence": row.get("evidence"), "comment": str(row.get("comment") or "").strip()}
+    return clean
+
+
+def calibration_group(entries, group_id=None):
+    if not entries or any(not isinstance(e, dict) or not e.get("conversationId") for e in entries):
+        raise ValueError("В файле нет строк с ID диалога.")
+    ids = {str(entry["conversationId"]).strip() for entry in entries}
+    if group_id:
+        known = {r["conversation_id"] for r in storage.get_dataset(group_id)}
+        missing = sorted(ids - known)
+        if missing:
+            raise ValueError(f"В наборе {group_id} нет диалога {missing[0]}. Выберите набор с этими диалогами.")
+        return group_id
+    matches = [d["groupId"] for d in storage.list_datasets()
+               if ids.issubset({r["conversation_id"] for r in storage.get_dataset(d["groupId"])})]
+    if len(matches) == 1:
+        return matches[0]
+    raise ValueError("Не удалось однозначно определить набор разметки. Выберите набор и загрузите файл ещё раз.")
+
+
+def save_calibration(entries, updated_at, source="", *, group=None, submission=None):
+    clean = _clean_entries(entries)
+    if not clean:
+        raise ValueError("В файле нет заполненных оценок.")
+    doc = {"entries": list(clean.values()), "updatedAt": updated_at, "source": source}
+    who = str((submission or {}).get("who") or "").strip()
+
+    def merge(root):
+        if group is None:  # previously stored unscoped consensus
+            root.update(doc)
+        else:
+            record = root.setdefault("groups", {}).setdefault(group, {})
+            if who:
+                reviewers = record.setdefault("reviewers", {})
+                previous = reviewers.get(who.casefold(), {}).get("document", {})
+                merged = {_pair(e): e for e in previous.get("entries", [])}
+                merged.update({_pair(e): e for e in entries if _pair(e) in clean})
+                reviewers[who.casefold()] = {"source": source, "updatedAt": updated_at,
+                                             "document": {**submission, "who": who, "entries": list(merged.values())}}
+            else:
+                record["consensus"] = doc
+            record["updatedAt"] = updated_at
+        return doc
+
+    return storage.update_calibration(merge)
+
+
+def clear_calibration(group, updated_at):
+    # An empty scoped record also hides this group's previous unscoped calibration.
+    storage.update_calibration(lambda root: root.setdefault("groups", {}).update({
+        group: {"consensus": {"entries": [], "updatedAt": updated_at, "source": ""}}
+    }))
+
+
+def group_calibration(group, records):
+    saved = get_calibration()
+    groups = saved.get("groups", {})
+    available = sorted(g for g, d in groups.items() if d.get("reviewers") or d.get("consensus", {}).get("entries"))
+    record = groups.get(group, {})
+    ids = {r["conversation_id"] for r in records}
+    consensus = record.get("consensus") or {
+        "entries": [e for e in saved.get("entries", []) if e["conversationId"] in ids],
+        "updatedAt": saved.get("updatedAt"), "source": saved.get("source"),
+    }
+    reviewers = record.get("reviewers", {})
+    if not reviewers:
+        return {**consensus, "availableGroups": available}
+
+    votes = collections.defaultdict(dict)
+    authors = []
+    for imported in reviewers.values():
+        doc = imported["document"]
+        who = doc["who"]
+        entries = _clean_entries(doc["entries"])
+        authors.append({"name": who, "source": imported["source"], "entries": len(entries),
+                        "dialogs": len({cid for cid, _ in entries})})
+        for key, entry in entries.items():
+            votes[key][who] = entry["value"]
+
+    unanimous, conflicts, partial = {}, [], []
+    for (cid, code), by_author in sorted(votes.items()):
+        row = {"conversationId": cid, "criterionCode": code, "votes": by_author}
+        values = set(by_author.values())
+        if len(values) > 1:
+            conflicts.append(row)
+        elif len(by_author) < len(authors) or len(by_author) < 2:
+            partial.append(row)
+        else:
+            unanimous[cid, code] = {**row, "value": next(iter(values))}
+    # Explicit team decisions take precedence, including decisions on previously disputed rows.
+    chosen = dict(unanimous)
+    chosen.update({_pair(e): e for e in consensus["entries"]})
+    team = {"authors": sorted(authors, key=lambda a: a["name"]), "total": sum(a["entries"] for a in authors),
+            "unanimous": len(unanimous), "decisions": len(consensus["entries"]),
+            "conflicts": conflicts, "partial": partial}
+    return {"entries": list(chosen.values()), "updatedAt": record.get("updatedAt"),
+            "source": consensus.get("source") or "Индивидуальная разметка", "team": team, "availableGroups": available}
 
 
 def parse_xlsx(data):
@@ -100,10 +202,11 @@ def parse_xlsx(data):
 
 def parse_json(data):
     doc = json.loads(data.decode("utf-8-sig") if isinstance(data, bytes) else data)
-    entries = doc.get("entries") if isinstance(doc, dict) else doc
-    if not isinstance(entries, list):
+    if isinstance(doc, list):
+        doc = {"entries": doc}
+    if not isinstance(doc, dict) or not isinstance(doc.get("entries"), list):
         raise ValueError("Ожидается список entries с полями conversationId, criterionCode, value")
-    return entries
+    return doc
 
 
 # ---------- agreement ----------
@@ -168,6 +271,7 @@ def agreement(results, calibration=None, records=None):
         "entries": len(entries), "compared": total, "agree": agree, "near": near,
         "rate": scoring.round2(agree / total * 100) if total else None,
         "lenientRate": scoring.round2((agree + near) / total * 100) if total else None,
+        "team": calibration.get("team"), "availableGroups": calibration.get("availableGroups", []),
         "perCriterion": sorted(per_crit.values(), key=lambda x: str(x["code"])),
         "perLanguage": sorted(per_lang.values(), key=lambda x: x["language"]),
         "rows": rows, "missing": sorted(missing), "updatedAt": calibration.get("updatedAt"), "source": calibration.get("source"),
@@ -280,7 +384,7 @@ def overview(group_id, section=None, operator=None):
         return patterns(results, records)
     verification = {
         "group": group_id, "evaluated": len(results), "records": len(records),
-        "calibration": agreement(results, records=records),
+        "calibration": agreement(results, calibration=group_calibration(group_id, records), records=records),
         "reproducibility": second.reproducibility(list(results.values())),
     }
     if section == "model":

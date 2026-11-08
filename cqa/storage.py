@@ -33,6 +33,15 @@ def _write(name, data):
         os.replace(tmp, _path(name))
 
 
+def update_calibration(change):
+    """Merge uploads while holding the same lock as the atomic file replacement."""
+    with _lock:
+        doc = _read("calibration", {})
+        result = change(doc)
+        _write("calibration", doc)
+        return result
+
+
 # ---------- datasets ----------
 
 def list_datasets():
