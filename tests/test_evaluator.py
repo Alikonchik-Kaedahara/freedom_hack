@@ -178,6 +178,15 @@ def test_legacy_replay_keeps_its_original_verdict():
     assert evaluator.validate(raw, CHAT, RECORD)[1]
 
 
+def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edits():
+    for cl in DEFAULT_CHECKLISTS:
+        assert evaluator.CONSULTATION_NOTE in evaluator.render_checklist(cl)
+        edited = copy.deepcopy(cl)
+        edited["criteria"][3]["description"] = "Проверьте знание нового продукта."
+        assert evaluator.CONSULTATION_NOTE not in evaluator.render_checklist(edited)
+        assert evaluator.FLOW_NOTE in evaluator.render_checklist(edited)
+
+
 def test_cloud_client_accepts_a_key_from_settings(monkeypatch):
     import anthropic
 
