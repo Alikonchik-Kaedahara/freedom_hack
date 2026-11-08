@@ -139,7 +139,7 @@ def test_incoherent_exchange_retries_instead_of_accepting_generic_ten(monkeypatc
     cl = {"criteria": [CHAT["criteria"][5]]}
     wrong = dict(verdict="10", confidence="high", evidence=[1], disruptionTurns=[], explanation="Ясно и связно.")
     fixed = dict(verdict="4", confidence="high", evidence=[0, 1, 2, 3], disruptionTurns=[1, 2],
-                 explanation="В ответ на вопрос об отчёте оператор предложил отключить уведомления. Клиент повторил вопрос.")
+                 explanation="В ответ на вопрос об отчёте оператор предложил отключить уведомления. Клиент повторил вопрос: «Где его найти?».")
     calls = []
 
     def cloud(settings, system, messages, schema):
@@ -178,6 +178,22 @@ def test_legacy_replay_keeps_its_original_verdict():
     assert evaluator.validate(raw, CHAT, RECORD)[1]
 
 
+def test_four_requires_the_clients_actual_request_in_the_cited_disruption():
+    cl = {"criteria": [CHAT["criteria"][5]]}
+    record = {"transcript": [
+        {"speaker": "client", "text": "Где скачать форму?"},
+        {"speaker": "operator", "text": "Включите уведомления."},
+        {"speaker": "client", "text": "Я про форму. Где её скачать?"},
+    ]}
+    item = dict(verdict="4", confidence="high", evidence=[0, 1, 2], disruptionTurns=[1, 2],
+                explanation="Клиенту пришлось переспросить: «Где именно нажать?»")
+    assert evaluator.validate({"c6": item}, cl, record)[1]
+    item["explanation"] = "Клиент снова спрашивает: «Где её скачать?»"
+    assert not evaluator.validate({"c6": item}, cl, record)[1]
+    item["disruptionTurns"] = [1]
+    assert evaluator.validate({"c6": item}, cl, record)[1]
+
+
 def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edits():
     for cl in DEFAULT_CHECKLISTS:
         assert evaluator.CONSULTATION_NOTE in evaluator.render_checklist(cl)
@@ -185,6 +201,8 @@ def test_consultation_guidance_applies_to_both_builtin_profiles_and_respects_edi
         edited["criteria"][3]["description"] = "Проверьте знание нового продукта."
         assert evaluator.CONSULTATION_NOTE not in evaluator.render_checklist(edited)
         assert evaluator.FLOW_NOTE in evaluator.render_checklist(edited)
+        edited["criteria"][1]["naRule"] = "Другое условие неприменимости."
+        assert evaluator.DISCOVERY_NOTE not in evaluator.render_checklist(edited)
 
 
 def test_cloud_client_accepts_a_key_from_settings(monkeypatch):

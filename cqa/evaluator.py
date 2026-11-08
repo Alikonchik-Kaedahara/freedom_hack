@@ -76,7 +76,10 @@ FLOW_NOTE = """Для этого критерия прочитай весь ра
 Проверяй связь и порядок реплик. Ошибка безопасности или неполный ответ сами по себе \
 не определяют эту ступень. Для снижения укажи наблюдаемый сбой именно в ведении разговора. Отличай 4 от 0: \
 при 4 можно проследить разговор и увидеть, почему клиенту пришлось переспросить; при 0 последовательность \
-указаний невозможно восстановить из-за бессвязности или противоречий. Нерешённый запрос сам по себе не означает 0."""
+указаний невозможно восстановить из-за бессвязности или противоречий. Нерешённый запрос сам по себе не означает 0. \
+Для 4 процитируй в «ёлочках» реплику клиента из disruptionTurns: что именно пришлось повторить из-за формулировок \
+или порядка ответов? Фразы «этот вопрос ещё не решён», отказ платить и проверка того, правильно ли клиент понял \
+ответ, сами по себе такого переспроса не доказывают."""
 
 
 CONSULTATION_NOTE = """Выдели вопросы, которые клиент действительно задал, и проверь ответ или следующий шаг по каждому. \
@@ -88,16 +91,40 @@ CONSULTATION_NOTE = """Выдели вопросы, которые клиент 
 у самого ответа есть конкретная ошибка или пропуск, и укажи их."""
 
 
-def _uses_builtin_scale(c, export_id):
-    """Apply extra guidance only while the team's selected rule matches the original."""
-    if c.get("type") != "scale":
-        return False
+DISCOVERY_NOTE = """Сначала установи, какого конкретно сведения не хватало для ответа на исходный запрос. \
+Учитывай детали, уже названные клиентом, в том числе боту. Если уточнять нечего или человек ушёл, так и \
+не изложив вопрос, примени условие N/A. Даже когда последующий ответ оператора был плохим, для «Нет» здесь \
+нужно назвать действительно недостающую деталь, необходимую для ответа, или ненужный повтор уже известного."""
+
+EMPATHY_NOTE = """Уточнение клиента и указание на пропущенную часть вопроса могут быть нейтральными. Если \
+клиент выразил неудобство, поясни, что именно он сказал и как оператор на это отреагировал. Формальное отсутствие \
+извинения само по себе не определяет оценку. Невежливость самого оператора тоже учитывается."""
+
+CLOSURE_NOTE = """Прочитай последнюю реплику оператора целиком и предыдущие завершающие реплики. Отдельно \
+проверь наличие итога или предложения помощи и наличие прощания. Перечисление того, что успели сделать, — \
+итог даже при частично решённом запросе; полнота решения оценивается отдельно. Одного «До свидания» недостаточно. \
+Если разговор оборвался, проверь, мог ли оператор завершить его. При «Да» или «Нет» процитируй слова, на которых \
+основан вывод, если они есть."""
+
+BUILTIN_GUIDANCE = {
+    "discovery": DISCOVERY_NOTE,
+    "consultation": CONSULTATION_NOTE,
+    "empathy": EMPATHY_NOTE,
+    "dialogue": FLOW_NOTE,
+    "closure": CLOSURE_NOTE,
+}
+
+
+def _builtin_rule(c):
+    """Return the original rule's export ID only while its scoring instructions still match."""
+    fields = ("type", "name", "scale", "description", "naAllowed", "naRule")
+    identity = "exportId" if c.get("exportId") else "code"
     for checklist in DEFAULT_CHECKLISTS:
-        original = next(item for item in checklist["criteria"] if item["exportId"] == export_id)
-        same_id = c.get("exportId") == export_id if c.get("exportId") else c.get("code") == original["code"]
-        if same_id and all(c.get(k) == original.get(k) for k in ("name", "scale", "description", "naAllowed")):
-            return True
-    return False
+        for original in checklist["criteria"]:
+            if c.get(identity) == original[identity] and all(c.get(k) == original.get(k) for k in fields):
+                return original["exportId"]
+    return None
+
 
 FIX_NOTE = """Твой предыдущий ответ не прошёл проверку. Исправь перечисленные проблемы и верни ПОЛНЫЙ JSON заново \
 (все критерии, тот же формат):
@@ -138,10 +165,9 @@ def render_checklist(checklist):
         if c["type"] == "scale":
             for s in sorted(c.get("scale", []), key=lambda s: -s["value"]):
                 lines.append(f"- {s['value']}: {s.get('label', '')}")
-        if _uses_builtin_scale(c, "dialogue"):
-            lines.append(FLOW_NOTE)
-        elif _uses_builtin_scale(c, "consultation"):
-            lines.append(CONSULTATION_NOTE)
+        guide = BUILTIN_GUIDANCE.get(_builtin_rule(c))
+        if guide:
+            lines.append(guide)
         if c.get("naAllowed") and c["type"] != "flag":
             lines.append(f"N/A допустим, если: {c.get('naRule') or 'критерий неприменим к диалогу'}")
         else:
@@ -196,7 +222,7 @@ def build_schema(checklist, with_knowledge=False):
             "confidence": {"type": "string", "enum": CONFIDENCE},
         }
         required = ["evidence", "explanation", "verdict", "confidence"]
-        if _uses_builtin_scale(c, "dialogue"):
+        if _builtin_rule(c) == "dialogue":
             fields["disruptionTurns"] = {"type": "array", "items": {"type": "integer"}}
             required.append("disruptionTurns")
         if with_knowledge and is_consultation(c):
@@ -238,6 +264,13 @@ def prompt_hash(system):
 
 # ---------- validation: LLM proposes, code verifies ----------
 
+def _quotes_speaker(explanation, transcript, indices, speaker):
+    quotes = re.findall(r"«([^»]+)»", explanation)
+    replies = [" ".join((transcript[i].get("text") or "").split()) for i in indices
+               if transcript[i].get("speaker") == speaker]
+    return any(" ".join(q.split()) in reply for q in quotes if any(ch.isalnum() for ch in q) for reply in replies)
+
+
 def _flow_issues(answer, disruptions, transcript):
     evidence = answer["evidence"]
     if not isinstance(disruptions, list) or any(type(i) is not int or i not in evidence for i in disruptions):
@@ -246,17 +279,15 @@ def _flow_issues(answer, disruptions, transcript):
     if answer["answer"] != 10:
         if not disruptions and answer["confidence"] != "low":
             yield "Укажи реплики, где проявился сбой выбранной ступени, либо объясни нехватку данных с низкой уверенностью."
+        if answer["answer"] == 4 and not _quotes_speaker(answer["explanation"], transcript, disruptions, "client"):
+            yield "Для 4 укажи среди сбоев реплику клиента и процитируй его переспрос в «ёлочках». Сверь причину переспроса со шкалой."
         return
     if disruptions:
         yield "Ты указал сбой и одновременно выставил 10. Перечитай отмеченный участок и сверь вердикт со шкалой."
     cited = [transcript[i] for i in evidence]
     if any(t.get("speaker") == "client" for t in transcript) and not any(t.get("speaker") == "client" for t in cited):
         yield "Для максимума укажи также реплику клиента, с которой связан ответ оператора."
-    quotes = re.findall(r"«([^»]+)»", answer["explanation"])
-    replies = [" ".join((t.get("text") or "").split()) for t in cited if t.get("speaker") == "operator"]
-    grounded = any(" ".join(quote.split()) in reply for quote in quotes if any(ch.isalnum() for ch in quote)
-                   for reply in replies)
-    if not grounded:
+    if not _quotes_speaker(answer["explanation"], transcript, evidence, "operator"):
         yield "Для максимума объясни связь вопроса и ответа и приведи точную цитату «…» из отмеченной реплики оператора."
 
 
@@ -337,7 +368,7 @@ def validate(raw, checklist, record, known_facts=None, *, replayed=False):
         answers[c["id"]] = {
             "answer": answer, "explanation": explanation, "evidence": evidence, "confidence": confidence,
         }
-        if _uses_builtin_scale(c, "dialogue") and (not replayed or "disruptionTurns" in item):
+        if _builtin_rule(c) == "dialogue" and (not replayed or "disruptionTurns" in item):
             disruptions = item.get("disruptionTurns")
             answers[c["id"]]["disruptionTurns"] = disruptions
             for issue in _flow_issues(answers[c["id"]], disruptions, transcript):
