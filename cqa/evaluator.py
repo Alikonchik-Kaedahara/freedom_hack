@@ -20,11 +20,12 @@ decides instead of the model guessing.
 import hashlib
 import json
 import os
+import re
 from datetime import datetime
 
 import requests
 
-from .defaults import PRICING
+from .defaults import DEFAULT_CHECKLISTS, PRICING
 
 MAX_ATTEMPTS = 3
 CONFIDENCE = ["high", "medium", "low"]
@@ -54,6 +55,33 @@ low — данных мало или они противоречивы. При l
 CALL_NOTE = """Это телефонный звонок. Транскрипт получен автоматическим распознаванием речи: возможны ошибки распознавания \
 и скрытые данные ([Имя скрыто], [Персональные данные скрыты]) — это не ошибки оператора. Оценивай устную речь: \
 логичность, понятность объяснений, корректность формулировок, паузы и удержание."""
+
+FLOW_NOTE = """Для этого критерия прочитай весь разговор, включая реплики после первого понятного ответа. \
+Для каждого запроса проследи, на что оператор ответил, не сменил ли тему без объяснения, не противоречат ли \
+друг другу его инструкции и пришлось ли клиенту снова задавать тот же вопрос. Отличай такой переспрос от \
+нового вопроса, смены темы самим клиентом и естественного уточнения. Незакрытый вопрос сам по себе относится \
+к полноте консультации (04); для 06 важен ход разговора. Порог первой реакции в оценку не входит.
+В disruptionTurns перечисли номера реплик, которые показывают конкретные сбои в ведении диалога оператором, \
+и включи их в evidence. Если сбоев нет, верни пустой список. Перед выбором ступени сравни её с соседней по шкале. \
+В explanation опиши конкретный запрос, что сказал оператор в ответ и почему это соответствует выбранной ступени. \
+Для 10 обязательно приведи короткую точную цитату оператора в «ёлочках» на исходном языке. В evidence укажи \
+связанные реплики клиента и оператора. Не приписывай клиенту понимание, если он этого не показал. \
+Если была только передача оператору и приветствие, опиши это ограничение и поставь низкую уверенность.
+Примеры различий: клиент уточнил, на каком экране искать отчёт, получил понятный путь и нашёл его — возможны 10. \
+Один сбой, затем оператор сам исправил инструкцию и клиент может продолжить — 7. Оператор ответил про тариф \
+на вопрос об отчёте, и клиенту пришлось повторить исходный вопрос — 4. Оператор даёт взаимоисключающие \
+указания и к концу разговора непонятно, что делать — 0."""
+
+
+def _uses_flow_rubric(c):
+    """Specific guidance belongs to the organizers' dialogue scale, not to its slot number."""
+    if c.get("type") != "scale" or (c.get("exportId") or c.get("code")) not in ("dialogue", "06"):
+        return False
+    for checklist in DEFAULT_CHECKLISTS:
+        original = next(item for item in checklist["criteria"] if item["exportId"] == "dialogue")
+        if all(c.get(k) == original.get(k) for k in ("name", "scale", "description", "naAllowed")):
+            return True
+    return False
 
 FIX_NOTE = """Твой предыдущий ответ не прошёл проверку. Исправь перечисленные проблемы и верни ПОЛНЫЙ JSON заново \
 (все критерии, тот же формат):
@@ -94,6 +122,8 @@ def render_checklist(checklist):
         if c["type"] == "scale":
             for s in sorted(c.get("scale", []), key=lambda s: -s["value"]):
                 lines.append(f"- {s['value']}: {s.get('label', '')}")
+        if _uses_flow_rubric(c):
+            lines.append(FLOW_NOTE)
         if c.get("naAllowed") and c["type"] != "flag":
             lines.append(f"N/A допустим, если: {c.get('naRule') or 'критерий неприменим к диалогу'}")
         else:
@@ -148,6 +178,9 @@ def build_schema(checklist, with_knowledge=False):
             "confidence": {"type": "string", "enum": CONFIDENCE},
         }
         required = ["evidence", "explanation", "verdict", "confidence"]
+        if _uses_flow_rubric(c):
+            fields["disruptionTurns"] = {"type": "array", "items": {"type": "integer"}}
+            required.append("disruptionTurns")
         if with_knowledge and is_consultation(c):
             fields["contradicts"] = {"type": "array", "items": {"type": "string"}}
             required.append("contradicts")
@@ -187,7 +220,29 @@ def prompt_hash(system):
 
 # ---------- validation: LLM proposes, code verifies ----------
 
-def validate(raw, checklist, record, known_facts=None):
+def _flow_issues(answer, disruptions, transcript):
+    evidence = answer["evidence"]
+    if not isinstance(disruptions, list) or any(type(i) is not int or i not in evidence for i in disruptions):
+        yield "Укажи номера реплик со сбоем среди доказательств. Если сбоев нет, верни пустой список."
+        return
+    if answer["answer"] != 10:
+        if not disruptions and answer["confidence"] != "low":
+            yield "Укажи реплики, где проявился сбой выбранной ступени, либо объясни нехватку данных с низкой уверенностью."
+        return
+    if disruptions:
+        yield "Ты указал сбой и одновременно выставил 10. Перечитай отмеченный участок и сверь вердикт со шкалой."
+    cited = [transcript[i] for i in evidence]
+    if any(t.get("speaker") == "client" for t in transcript) and not any(t.get("speaker") == "client" for t in cited):
+        yield "Для максимума укажи также реплику клиента, с которой связан ответ оператора."
+    quotes = re.findall(r"«([^»]+)»", answer["explanation"])
+    replies = [" ".join((t.get("text") or "").split()) for t in cited if t.get("speaker") == "operator"]
+    grounded = any(" ".join(quote.split()) in reply for quote in quotes if any(ch.isalnum() for ch in quote)
+                   for reply in replies)
+    if not grounded:
+        yield "Для максимума объясни связь вопроса и ответа и приведи точную цитату «…» из отмеченной реплики оператора."
+
+
+def validate(raw, checklist, record, known_facts=None, *, replayed=False):
     """Normalize a raw model answer and list every problem found.
 
     Returns (answers, problems). `answers` is the normalized per-criterion dict
@@ -264,6 +319,11 @@ def validate(raw, checklist, record, known_facts=None):
         answers[c["id"]] = {
             "answer": answer, "explanation": explanation, "evidence": evidence, "confidence": confidence,
         }
+        if _uses_flow_rubric(c) and (not replayed or "disruptionTurns" in item):
+            disruptions = item.get("disruptionTurns")
+            answers[c["id"]]["disruptionTurns"] = disruptions
+            for issue in _flow_issues(answers[c["id"]], disruptions, transcript):
+                problem(c, "flow_evidence", f"Критерий {label}: {issue}")
         if is_consultation(c) and isinstance(item.get("contradicts"), list):
             ids = [str(x) for x in item["contradicts"] if isinstance(x, (str, int))]
             if known_facts is not None:
@@ -293,7 +353,6 @@ def _call_cloud(settings, system, messages, schema):
     cfg = settings.get("cloud", {})
     key = cfg.get("apiKey") or None
     if not key:
-        import os
         key = os.environ.get("ANTHROPIC_API_KEY")
     if not key:
         raise EvaluationError("Не задан ключ Claude API. Укажите его в разделе «Модель».")
@@ -514,7 +573,8 @@ def evaluate(record, checklist, settings, max_attempts=MAX_ATTEMPTS, use_knowled
             messages += [{"role": "assistant", "content": text or "{}"},
                          {"role": "user", "content": FIX_NOTE.format(problems=_format_problems(problems))}]
             continue
-        answers, problems = validate(raw, checklist, record, known_facts if known_facts else None)
+        answers, problems = validate(raw, checklist, record, known_facts if known_facts else None,
+                                    replayed=engine_name == "replay")
         if not problems or engine_name == "replay":
             break
         if attempt < max_attempts:

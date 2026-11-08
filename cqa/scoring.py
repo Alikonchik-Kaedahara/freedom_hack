@@ -107,10 +107,12 @@ def disputed(result):
     """Criteria the reviewer should look at: unresolved validation issues, low model confidence,
     or a second opinion that disagrees with the first answer."""
     out = []
-    for cid, a in (result.get("answers") or {}).items():
-        if a.get("needsReview") or a.get("confidence") == "low":
-            out.append(cid)
-    cmp = (result.get("secondOpinion") or {}).get("comparison") or {}
+    second = result.get("secondOpinion") or {}
+    for source in (result, second):
+        for cid, a in (source.get("answers") or {}).items():
+            if cid not in out and (a.get("needsReview") or a.get("confidence") == "low"):
+                out.append(cid)
+    cmp = second.get("comparison") or {}
     for cid in list(cmp.get("disagree", [])) + list(cmp.get("near", [])):
         if cid not in out:
             out.append(cid)

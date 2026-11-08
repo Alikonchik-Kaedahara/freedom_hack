@@ -49,15 +49,18 @@ export async function startSecondOpinion(ids, engine) {
 export function confirmSecondOpinion(ids) {
   if (!ids.length) return;
   const n = ids.length;
-  // Rough pace: cloud runs 4 dialogs at a time (~20 s each), the local engine one at a time (~30 s).
-  const perDialog = state.settings?.engine === 'local' ? 30 : 5;
-  const minutes = Math.max(1, Math.round((n * perDialog) / 60));
+  const settings = state.settings;
+  const pick = settings.engine === 'replay' && h('select', { class: 'select' },
+    h('option', { value: 'cloud', disabled: !settings.cloud?.hasKey }, `Облачная · ${settings.cloud?.model || 'Claude'}`),
+    h('option', { value: 'local' }, `Локальная · ${settings.local?.model || 'Ollama'}`));
+  if (pick) pick.value = settings.cloud?.hasKey ? 'cloud' : 'local';
   const m = openModal({
     title: 'Второе мнение',
-    sub: `Будет сделано ${n} ${pluralRu(n, 'повторная оценка', 'повторные оценки', 'повторных оценок')}. Это займёт около ${minutes} ${pluralRu(minutes, 'минуты', 'минут', 'минут')}. Первая оценка не меняется; критерии, где ответы разойдутся, станут спорными.`,
+    sub: `Модель заново оценит ${n} ${pluralRu(n, 'диалог', 'диалога', 'диалогов')}. В карточке можно сравнить баллы и объяснения. Облачный вызов расходует средства API.`,
+    body: pick && h('label', { class: 'field' }, 'Модель для повторной оценки', pick),
     footer: [
       h('button', { class: 'btn btn-ghost', type: 'button', onclick: () => m.close() }, 'Отмена'),
-      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); startSecondOpinion(ids); } }, 'Запустить'),
+      h('button', { class: 'btn btn-primary', type: 'button', onclick: () => { m.close(); startSecondOpinion(ids, pick ? pick.value : undefined); } }, 'Запустить'),
     ],
   });
 }
@@ -117,7 +120,7 @@ function finish(j) {
     toast(`Оценено ${j.done}, с ошибкой ${j.failed}: ${j.errors[0]?.message || ''}`, { type: 'error', timeout: 8000 });
   } else if (j.kind === 'second') {
     toast(j.needsReview
-      ? `Второе мнение получено для ${j.done} ${pluralRu(j.done, 'диалога', 'диалогов', 'диалогов')}; расхождения в ${j.needsReview} ${pluralRu(j.needsReview, 'диалоге', 'диалогах', 'диалогах')} помечены как спорные`
+      ? `Второе мнение получено. Требуют проверки: ${j.needsReview} из ${j.done}.`
       : `Второе мнение получено для ${j.done} ${pluralRu(j.done, 'диалога', 'диалогов', 'диалогов')}: вердикты совпали полностью`, { timeout: 7000 });
   } else if (j.needsReview) {
     toast(`Готово: ${j.done} ${pluralRu(j.done, 'диалог оценён', 'диалога оценено', 'диалогов оценено')}; в ${j.needsReview} ${pluralRu(j.needsReview, 'диалоге', 'диалогах', 'диалогах')} есть критерии, требующие проверки`, { timeout: 7000 });

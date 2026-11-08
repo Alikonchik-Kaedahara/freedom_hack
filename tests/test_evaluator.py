@@ -35,6 +35,8 @@ def good_raw(checklist=CHAT):
             verdict = "yes"
         raw[c["id"]] = {"verdict": verdict, "evidence": [2, 4], "explanation": "ok", "confidence": "high"}
     raw["c3"] = {"verdict": "na", "evidence": [1], "explanation": "общий вопрос", "confidence": "high"}
+    raw["c6"].update(evidence=[1, 2, 4], disruptionTurns=[],
+                     explanation="На вопрос о комиссии оператор попросил «Уточните тариф, пожалуйста.» и сообщил ставку.")
     raw["c8"]["evidence"] = []
     return raw
 
@@ -107,6 +109,85 @@ def test_flag_no_needs_no_evidence_and_unknown_confidence_defaults():
     answers, problems = evaluator.validate(raw, CHAT, RECORD)
     assert problems == []
     assert answers["c8"]["confidence"] == "medium"
+
+
+@pytest.mark.parametrize("language,question,reply", [
+    ("RU", "Где отчёт?", "Откройте раздел Отчёты."),
+    ("KZ", "Есеп қайда?", "Есептер бөлімін ашыңыз."),
+    ("EN", "Where is the report?", "Open Reports."),
+], ids=["ru", "kz", "en"])
+def test_flow_maximum_requires_grounded_operator_quote_and_client_context(language, question, reply):
+    rec = {**RECORD, "language": language, "transcript": [
+        {"speaker": "client", "text": question}, {"speaker": "operator", "text": reply}]}
+    cl = {"criteria": [CHAT["criteria"][5]]}
+    row = dict(verdict="10", confidence="high", evidence=[0, 1], disruptionTurns=[],
+               explanation=f"На вопрос об отчёте оператор дал путь: «{reply}».")
+    assert not evaluator.validate({"c6": row}, cl, rec)[1]
+    for change in [dict(explanation="Ясно и связно."), dict(explanation=f"Оператор сказал «{question}»."),
+                   dict(evidence=[1]), dict(disruptionTurns=[1]), dict(disruptionTurns=[-1])]:
+        _, problems = evaluator.validate({"c6": {**row, **change}}, cl, rec)
+        assert any(p["code"] == "flow_evidence" for p in problems)
+
+
+def test_incoherent_exchange_retries_instead_of_accepting_generic_ten(monkeypatch):
+    rec = {**RECORD, "transcript": [
+        {"timestamp": "00:00", "speaker": "client", "text": "Где скачать отчёт?"},
+        {"timestamp": "00:10", "speaker": "operator", "text": "Отключите уведомления."},
+        {"timestamp": "00:20", "speaker": "client", "text": "Я спрашиваю про отчёт. Где его найти?"},
+        {"timestamp": "00:30", "speaker": "operator", "text": "В разделе Отчёты."},
+    ]}
+    cl = {"criteria": [CHAT["criteria"][5]]}
+    wrong = dict(verdict="10", confidence="high", evidence=[1], disruptionTurns=[], explanation="Ясно и связно.")
+    fixed = dict(verdict="4", confidence="high", evidence=[0, 1, 2, 3], disruptionTurns=[1, 2],
+                 explanation="В ответ на вопрос об отчёте оператор предложил отключить уведомления. Клиент повторил вопрос.")
+    calls = []
+
+    def cloud(settings, system, messages, schema):
+        calls.append(messages[-1]["content"])
+        return json.dumps({"c6": wrong if len(calls) == 1 else fixed}), {}, {"type": "cloud"}
+
+    monkeypatch.setattr(evaluator, "_call_cloud", cloud)
+    answers, _, _, meta = evaluator.evaluate(rec, cl, {"engine": "cloud"}, use_knowledge=False)
+    assert len(calls) == 2 and "цитату" in calls[1]
+    assert answers["c6"]["answer"] == 4 and meta["unresolved"] == []
+    monkeypatch.setattr(evaluator, "_call_cloud", lambda *args: (json.dumps({"c6": wrong}), {}, {"type": "cloud"}))
+    answers, _, _, meta = evaluator.evaluate(rec, cl, {"engine": "cloud"}, use_knowledge=False)
+    assert meta["attempts"] == 3 and answers["c6"]["needsReview"]
+    replay_raw = replay._to_raw(answers)
+    assert evaluator.validate(replay_raw, cl, rec, replayed=True)[1]
+
+
+def test_flow_guidance_follows_the_official_rule_not_the_position():
+    call = DEFAULT_CHECKLISTS[1]
+    system, _ = evaluator.build_prompt({**RECORD, "channel": "voice call"}, call)
+    assert "disruptionTurns" in evaluator.build_schema(call)["properties"]["c6"]["required"]
+    assert "disruptionTurns" in system and evaluator.CALL_NOTE in system
+    edited = copy.deepcopy(CHAT)
+    edited["criteria"][5]["description"] = "Проверьте другую задачу по новой инструкции."
+    system, _ = evaluator.build_prompt(RECORD, edited)
+    assert "disruptionTurns" not in system
+    assert "disruptionTurns" not in evaluator.build_schema(edited)["properties"]["c6"]["properties"]
+
+
+def test_legacy_replay_keeps_its_original_verdict():
+    raw = good_raw()
+    raw["c6"].pop("disruptionTurns")
+    raw["c6"]["explanation"] = "Ответы ясные и связные."
+    answers, problems = evaluator.validate(raw, CHAT, RECORD, replayed=True)
+    assert not problems and answers["c6"]["answer"] == 10
+    assert evaluator.validate(raw, CHAT, RECORD)[1]
+
+
+def test_cloud_client_accepts_a_key_from_settings(monkeypatch):
+    import anthropic
+
+    def intercept(**kwargs):
+        assert kwargs["api_key"] == "fixture-key"
+        raise RuntimeError("Reached SDK without a network request")
+
+    monkeypatch.setattr(anthropic, "Anthropic", intercept)
+    with pytest.raises(RuntimeError, match="Reached SDK"):
+        evaluator._call_cloud({"cloud": {"apiKey": "fixture-key"}}, "test", [], {})
 
 
 # ---------- retries ----------

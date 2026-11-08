@@ -24,7 +24,7 @@ def sample_answers(cid, checklist_id="chat-base"):
     raw = json.load(open(os.path.join(replay.SAMPLE_DIR, "answers.json"), encoding="utf-8"))[cid][checklist_id]
     rec = next(r for r in sample_records() if r["conversation_id"] == cid)
     checklist = next(c for c in DEFAULT_CHECKLISTS if c["id"] == checklist_id)
-    answers, problems = evaluator.validate(raw, checklist, rec)
+    answers, problems = evaluator.validate(raw, checklist, rec, replayed=True)
     assert not problems, problems
     return rec, checklist, answers
 
@@ -69,6 +69,15 @@ def test_attach_marks_disputed_and_keeps_original():
     summary = scoring.summarize(res)
     assert summary["secondOpinion"]["disagree"] == ["c7"] and summary["secondOpinion"]["engine"]["model"] == "qwen"
     assert "c7" in summary["disputed"]
+
+
+def test_agreeing_second_opinion_still_needs_review_when_evidence_is_unresolved():
+    _, result = make_result("sample-ru-001")
+    answers = copy.deepcopy(result["answers"])
+    answers["c6"]["needsReview"] = True
+    second.attach(result, answers, {}, {"type": "cloud"}, {}, NOW)
+    assert result["secondOpinion"]["comparison"]["details"]["c6"]["status"] == "agree"
+    assert "c6" in scoring.disputed(result)
 
 
 def test_reproducibility_aggregates_by_criterion_language_and_engine():
@@ -258,9 +267,9 @@ def test_schema_and_validation_carry_contradictions():
     raw = json.load(open(os.path.join(replay.SAMPLE_DIR, "answers.json"), encoding="utf-8"))["sample-ru-001"]["chat-base"]
     raw = copy.deepcopy(raw)
     raw["c4"]["contradicts"] = ["kb-02", "kb-nope", 7]
-    answers, problems = evaluator.validate(raw, checklist, rec, known_facts={"kb-02", "kb-03"})
+    answers, problems = evaluator.validate(raw, checklist, rec, known_facts={"kb-02", "kb-03"}, replayed=True)
     assert not problems and answers["c4"]["contradicts"] == ["kb-02"], "unknown ids are dropped, no retry"
-    answers, _ = evaluator.validate(raw, checklist, rec)
+    answers, _ = evaluator.validate(raw, checklist, rec, replayed=True)
     assert answers["c4"]["contradicts"] == ["7", "kb-02", "kb-nope"], "without a known list ids are kept as given"
     assert "contradicts" not in answers["c1"]
     hits = knowledge.usage({"k": {"conversationId": "sample-ru-001", "answers": answers}}, {"facts": [{"id": "kb-02", "fact": "f"}]})
@@ -307,11 +316,22 @@ def test_report_renders_everything(fresh_storage):
 def fake_cloud(monkeypatch, flip=None):
     """A 'cloud' engine answering from demo/sample/answers.json; `flip` toggles one binary verdict."""
     answers = json.load(open(os.path.join(replay.SAMPLE_DIR, "answers.json"), encoding="utf-8"))
+    transcripts = {r["conversation_id"]: r["transcript"] for r in sample_records()}
 
     def call(settings, system, messages, schema):
         cid = messages[0]["content"].split("Диалог ")[1].split(" ")[0]
         checklist_id = "call-base" if "voice call" in messages[0]["content"].split("\n")[0] else "chat-base"
         raw = copy.deepcopy(answers[cid][checklist_id])
+        flow = raw["c6"]
+        if flow["verdict"] == "10":
+            turns = transcripts[cid]
+            client = next(i for i, t in enumerate(turns) if t["speaker"] == "client")
+            operator = next(i for i in flow["evidence"] if turns[i]["speaker"] == "operator")
+            flow["evidence"].append(client)
+            flow["explanation"] += f' Ответ оператора: «{turns[operator]["text"]}».'
+            flow["disruptionTurns"] = []
+        else:
+            flow["disruptionTurns"] = flow["evidence"]
         if flip and flip in raw:
             raw[flip]["verdict"] = "no" if raw[flip]["verdict"] == "yes" else "yes"
         if "contradicts" in schema["properties"].get("c4", {}).get("properties", {}):
@@ -452,7 +472,7 @@ def test_clean_flag_gets_checked_operator_turns():
     rec, checklist, answers = sample_answers("sample-ru-001")
     raw = copy.deepcopy(json.load(open(os.path.join(replay.SAMPLE_DIR, "answers.json"), encoding="utf-8"))["sample-ru-001"]["chat-base"])
     raw["c8"] = {"verdict": "no", "evidence": [], "explanation": "Грубых нарушений нет.", "confidence": "high"}
-    answers, problems = evaluator.validate(raw, checklist, rec)
+    answers, problems = evaluator.validate(raw, checklist, rec, replayed=True)
     assert not problems
     operator_turns = [i for i, t in enumerate(rec["transcript"]) if t["speaker"] == "operator"]
     assert answers["c8"]["evidence"] == operator_turns and operator_turns

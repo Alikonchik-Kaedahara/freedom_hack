@@ -90,8 +90,10 @@ export function score(checklist, answers) {
  */
 export function disputedIds(result) {
   const out = [];
-  for (const [id, a] of Object.entries(result?.answers || {})) {
-    if (a?.needsReview || a?.confidence === 'low') out.push(id);
+  for (const source of [result, result?.secondOpinion]) {
+    for (const [id, a] of Object.entries(source?.answers || {})) {
+      if ((a?.needsReview || a?.confidence === 'low') && !out.includes(id)) out.push(id);
+    }
   }
   const cmp = result?.secondOpinion?.comparison || {};
   for (const id of [...(cmp.disagree || []), ...(cmp.near || [])]) if (!out.includes(id)) out.push(id);

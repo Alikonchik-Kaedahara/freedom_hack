@@ -615,7 +615,9 @@ def _run_second(job_id, group_id, cid, engine_override):
         cmp = updated["secondOpinion"]["comparison"]
         with _jobs_lock:
             job["done"] += 1
-            if cmp["disagree"] or cmp["near"]:
+            if cmp["disagree"] or cmp["near"] or any(
+                a.get("needsReview") or a.get("confidence") == "low" for a in answers.values()
+            ):
                 job["needsReview"] += 1
     except EvaluationError as e:
         with _jobs_lock:

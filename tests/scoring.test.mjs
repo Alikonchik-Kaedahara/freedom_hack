@@ -55,6 +55,13 @@ test('disputedIds: needsReview or low confidence', () => {
   assert.equal(summarize({ ...result, checklist: fixture.checklist }).disputed.length, 2);
 });
 
+test('disputedIds: agreement with an unsupported second opinion still needs review', () => {
+  const result = { answers: { c6: { answer: 10 } }, secondOpinion: {
+    answers: { c6: { answer: 10, needsReview: true } }, comparison: { agree: ['c6'] },
+  } };
+  assert.deepEqual(disputedIds(result), ['c6']);
+});
+
 test('disputedIds: a second opinion that disagrees (or lands one step away) is disputed too', () => {
   const result = {
     answers: { c1: { answer: 'yes', confidence: 'high' }, c2: { answer: 'no', confidence: 'low' } },

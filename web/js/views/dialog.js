@@ -229,14 +229,13 @@ export function renderDialog(root, cid) {
     if (!d) return null;
     const second = so.answers?.[c.id];
     const v2 = verdictOf(c, d.second);
-    if (d.status === 'agree') {
-      return h('div', { class: 'so-note agree' }, icon('check', 13), `Второе мнение: совпало — ${v2.text}`);
-    }
-    return h('div', { class: `so-note ${d.status === 'near' ? 'near' : 'disagree'}` },
-      icon('alert', 13),
-      h('div', null,
-        h('b', null, d.status === 'near' ? 'Второе мнение: на ступень рядом — ' : 'Второе мнение расходится — '), `${v2.text}`,
-        second?.explanation ? h('div', { class: 'so-expl' }, second.explanation) : null));
+    const doubt = disputeLabel(second);
+    const tone = doubt && d.status === 'agree' ? 'near' : d.status;
+    const label = { agree: 'Второе мнение совпало', near: 'Второе мнение отличается на одну ступень', disagree: 'Второе мнение расходится' };
+    return h('div', { class: `so-note ${tone}` }, icon(tone === 'agree' ? 'check' : 'alert', 13),
+      h('div', null, h('b', null, label[d.status]), ' · ', v2.text,
+        second?.explanation && h('div', { class: 'so-expl' }, second.explanation),
+        doubt && h('div', null, doubt.text, second.needsReview && doubt.why ? ` · ${doubt.why}` : '')));
   }
 
   function knowledgeNote(ans) {
