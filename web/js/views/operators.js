@@ -7,7 +7,21 @@ import { violationPanel } from './insights.js';
 
 const UNKNOWN = 'Не представился';
 const UNNAMED = new Set([UNKNOWN, '[Имя скрыто]']);
-const list_state = { q: '', key: 'average', dir: 1 };
+// Score filter: quick bands are half-open («40–60» is 40 ≤ балл < 60), typed limits are inclusive.
+const list_state = { q: '', key: 'average', dir: 1, min: null, max: null, inclusive: false };
+const SCORE_BANDS = [
+  { label: 'ниже 40', min: null, max: 40 },
+  { label: '40–60', min: 40, max: 60 },
+  { label: '60–80', min: 60, max: 80 },
+  { label: '80 и выше', min: 80, max: null },
+];
+const hasRange = () => list_state.min != null || list_state.max != null;
+const inRange = (v) => {
+  if (v == null) return !hasRange();
+  if (list_state.min != null && v < list_state.min) return false;
+  if (list_state.max != null && (list_state.inclusive ? v > list_state.max : v >= list_state.max)) return false;
+  return true;
+};
 const SVGNS = 'http://www.w3.org/2000/svg';
 const svg = (tag, attrs, ...kids) => {
   const el = document.createElementNS(SVGNS, tag);
@@ -89,11 +103,35 @@ export function renderOperators(root, name) {
           drawTable();
         } }, label, h('span', { class: 'arr', 'aria-hidden': 'true' }, on ? (list_state.dir === 1 ? '↑' : '↓') : '↕')));
     };
+    // Score range: quick bands plus two inputs for any limits («больше 20», «между 60 и 80»).
+    const minInput = h('input', { class: 'input', type: 'number', min: 0, max: 100, step: 1, placeholder: 'от', 'aria-label': 'Средний балл от', value: list_state.min ?? '' });
+    const maxInput = h('input', { class: 'input', type: 'number', min: 0, max: 100, step: 1, placeholder: 'до', 'aria-label': 'Средний балл до', value: list_state.max ?? '' });
+    const bandsHost = h('div', { class: 'chips' });
+    const countEl = h('span', { class: 'muted small range-count' });
+    const num = (el) => { const v = el.value.trim(); if (v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : null; };
+    const onTyped = () => { list_state.min = num(minInput); list_state.max = num(maxInput); list_state.inclusive = true; drawBands(); drawTable(); };
+    minInput.addEventListener('input', onTyped);
+    maxInput.addEventListener('input', onTyped);
+    const setRange = (min, max, inclusive) => {
+      list_state.min = min; list_state.max = max; list_state.inclusive = inclusive;
+      minInput.value = min ?? ''; maxInput.value = max ?? '';
+      drawBands(); drawTable();
+    };
+    function drawBands() {
+      const chips = SCORE_BANDS.map((b) => {
+        const on = !list_state.inclusive && list_state.min === b.min && list_state.max === b.max;
+        return h('button', { class: `chip ${on ? 'on' : ''}`, type: 'button', 'aria-pressed': String(on),
+          onclick: () => (on ? setRange(null, null, false) : setRange(b.min, b.max, false)) }, b.label);
+      });
+      if (hasRange()) chips.push(h('button', { class: 'link-btn', type: 'button', onclick: () => setRange(null, null, false) }, 'Сбросить'));
+      bandsHost.replaceChildren(...chips);
+    }
     function drawTable() {
       const q = list_state.q.trim().toLowerCase();
       const val = (p) => (list_state.key === 'name' ? p.name : p[list_state.key] ?? -1);
       const rows = profiles.filter((p) => {
         if (q && !p.name.toLowerCase().includes(q)) return false;
+        if (!inRange(p.average)) return false;
         if (!band) return true;
         const low = p.dialogs.filter((d) => d.total != null && d.total < LOW_SCORE_THRESHOLD).length;
         return !UNNAMED.has(p.name) && (band === 'repeat' ? low >= 2 : low === 1);
@@ -104,9 +142,11 @@ export function renderOperators(root, name) {
         const x = val(a), y = val(b);
         return (typeof x === 'string' ? x.localeCompare(y, 'ru') : x - y) * list_state.dir;
       });
+      countEl.textContent = hasRange() || q ? `${rows.length} из ${profiles.length}` : '';
       if (!rows.length) {
         host.replaceChildren(h('div', { class: 'empty' }, h('h3', null, 'Таких операторов нет'),
-          q ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { list_state.q = ''; search.value = ''; drawTable(); } }, 'Сбросить поиск') : null));
+          hasRange() ? h('p', null, 'Ни у одного оператора средний балл не попадает в выбранный диапазон.') : null,
+          q || hasRange() ? h('button', { class: 'btn btn-secondary btn-sm', type: 'button', onclick: () => { list_state.q = ''; search.value = ''; setRange(null, null, false); } }, 'Сбросить фильтры') : null));
         return;
       }
       host.replaceChildren(h('table', { class: 'table op-table' },
@@ -130,11 +170,16 @@ export function renderOperators(root, name) {
         h('td', null, weakest.length ? h('div', { class: 'tags' }, weakest) : h('span', { class: 'muted' }, 'нет')),
         h('td', { class: 'row-act' }, h('button', { class: 'btn btn-secondary btn-xs', type: 'button', onclick: (e) => { e.stopPropagation(); open(); } }, 'Открыть')));
     };
+    drawBands();
     drawTable();
     return h('div', { class: 'card', style: { overflow: 'hidden' } },
-      h('div', { class: 'toolbar reg-toolbar' }, h('div', { class: 'search' }, icon('search', 16), search),
+      h('div', { class: 'toolbar reg-toolbar' },
+        h('div', { class: 'score-range', role: 'group', 'aria-label': 'Фильтр по среднему баллу' },
+          h('span', { class: 'range-label' }, 'Средний балл'), bandsHost,
+          h('span', { class: 'range-inputs' }, minInput, h('span', { class: 'muted' }, '—'), maxInput), countEl),
         band && h('a', { class: 'chip on', href: '#/operators', title: 'Показать всех операторов' },
-          `Ниже ${LOW_SCORE_THRESHOLD} · ${band === 'single' ? 'один диалог' : 'два и более'} ×`)),
+          `Ниже ${LOW_SCORE_THRESHOLD} · ${band === 'single' ? 'один диалог' : 'два и более'} ×`),
+        h('div', { class: 'search' }, icon('search', 16), search)),
       host);
   }
 

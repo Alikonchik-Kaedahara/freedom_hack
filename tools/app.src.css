@@ -1479,3 +1479,14 @@ a.q-line:hover b { text-decoration: underline; }
 .mx-filtered { flex-wrap: wrap; }
 .mx.mx-filtered i { width: auto; min-width: 30px; padding-inline: 4px; white-space: pre; }
 .criterion-filter[open] .criterion-caption { display: none; }
+
+/* Operators: average-score filter in the list toolbar (quick bands + typed limits). */
+.score-range { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.score-range .range-label { font-size: 12.5px; font-weight: 600; color: var(--cqa-text-secondary); white-space: nowrap; }
+.score-range .range-inputs { display: inline-flex; align-items: center; gap: 6px; }
+.score-range .range-inputs .input { width: 64px; height: 28px; padding: 0 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.score-range .range-count { white-space: nowrap; }
+@media (max-width: 760px) {
+  .score-range { width: 100%; }
+  .score-range .chips { flex-wrap: wrap; margin: 0; padding: 0; width: auto; overflow: visible; }
+}
